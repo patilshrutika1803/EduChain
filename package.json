@@ -1,0 +1,18 @@
+{
+  "name": "educhain",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @educhain/frontend dev",
+    "build": "pnpm --filter @educhain/frontend build",
+    "preview": "pnpm --filter @educhain/frontend preview",
+    "typecheck": "pnpm --filter @educhain/frontend typecheck",
+    "format": "pnpm --filter @educhain/frontend format",
+    "contracts:compile": "pnpm --filter @educhain/blockchain compile",
+    "contracts:test": "pnpm --filter @educhain/blockchain test",
+    "contracts:node": "pnpm --filter @educhain/blockchain node",
+    "contracts:deploy:local": "pnpm --filter @educhain/blockchain deploy:local",
+    "contracts:authorize-local-issuer": "pnpm --filter @educhain/blockchain authorize-local-issuer"
+  }
+}

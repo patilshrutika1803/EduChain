@@ -1,0 +1,6 @@
+packages:
+  - frontend
+  - blockchain
+
+allowBuilds:
+  keccak: true
