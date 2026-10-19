@@ -1,16 +1,23 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, Link } from 'react-router-dom';
 import { Shield, Mail, Lock, Wallet, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { DemoCredentialsPanel } from '../../components/auth/DemoCredentialsPanel';
-import { authenticateDemo } from '../../auth/demoAuth';
+import { authenticateDemo, getDemoLoginRedirect } from '../../auth/demoAuth';
+import { useDemoAuth } from '../../auth/useDemoAuth';
 
 export function InstitutionLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const auth = useDemoAuth();
+
+  if (auth.role) {
+    return <Navigate to={getDemoLoginRedirect(auth.role, location.state)} replace />;
+  }
 
   const handleLogin = (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
@@ -23,7 +30,7 @@ export function InstitutionLoginPage() {
         setError('Invalid institution demo email or password.');
         return;
       }
-      navigate('/institution/dashboard', { replace: true });
+      navigate(getDemoLoginRedirect('institution', location.state), { replace: true });
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : 'Unable to start the institution demo session.');
     }
@@ -95,6 +102,11 @@ export function InstitutionLoginPage() {
             <p className="mt-4 text-xs text-slate-500 text-center">
               Simulated prototype-only authentication. This does not verify issuer identity or connect to an institution.
             </p>
+            {auth.error && (
+              <p role="alert" className="mt-3 text-center text-xs text-red-700">
+                Demo session storage is unavailable: {auth.error}
+              </p>
+            )}
             <DemoCredentialsPanel role="institution" />
           </div>
 

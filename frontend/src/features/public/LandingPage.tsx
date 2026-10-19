@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { PublicNav, PublicFooter } from '../../components/layout/PublicLayout';
+import { useDemoAuth } from '../../auth/useDemoAuth';
 
 const HOW_STEPS = [
   { n: '01', title: 'Issue a local demo', desc: 'An institution demo account saves fictional academic details in this browser.' },
@@ -44,6 +45,8 @@ const TRUST_PILLARS = [
 ];
 
 export function LandingPage() {
+  const { role } = useDemoAuth();
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       <PublicNav />
@@ -88,12 +91,21 @@ export function LandingPage() {
                 >
                   Verify a Credential <ArrowRight size={15} />
                 </Link>
-                <Link
-                  to="/institution/login"
-                  className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all text-sm"
-                >
-                  Institution Login
-                </Link>
+                {role ? (
+                  <Link
+                    to={`/${role}/dashboard`}
+                    className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all text-sm"
+                  >
+                    Open my dashboard
+                  </Link>
+                ) : (
+                  <Link
+                    to="/institution/login"
+                    className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all text-sm"
+                  >
+                    Institution Login
+                  </Link>
+                )}
               </div>
             </div>
 
@@ -302,8 +314,8 @@ export function LandingPage() {
           <Link to="/verify" className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200">
             <QrCode size={16} /> Verify a Credential
           </Link>
-          <Link to="/student/login" className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-6 py-3 rounded-xl font-semibold hover:bg-slate-50 transition-colors">
-            Student Portal
+          <Link to={role ? `/${role}/dashboard` : '/student/login'} className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-6 py-3 rounded-xl font-semibold hover:bg-slate-50 transition-colors">
+            {role ? 'Open my dashboard' : 'Student Portal'}
           </Link>
         </div>
       </section>

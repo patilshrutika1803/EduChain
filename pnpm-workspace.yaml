@@ -1,6 +1,8 @@
 packages:
   - frontend
   - blockchain
+  - backend
 
 allowBuilds:
+  esbuild: true
   keccak: true

@@ -1,15 +1,10 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { getDemoRole, type DemoRole } from '../../auth/demoAuth';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import type { DemoRole } from '../../auth/demoAuth';
+import { useDemoAuth } from '../../auth/useDemoAuth';
 
 export function RequireDemoRole({ role }: { role: DemoRole }) {
-  let currentRole: ReturnType<typeof getDemoRole> = null;
-  let storageError = '';
-
-  try {
-    currentRole = getDemoRole();
-  } catch (error) {
-    storageError = error instanceof Error ? error.message : 'Unable to check the demo session.';
-  }
+  const { role: currentRole, error: storageError } = useDemoAuth();
+  const location = useLocation();
 
   if (storageError) {
     return (
@@ -29,5 +24,5 @@ export function RequireDemoRole({ role }: { role: DemoRole }) {
     return <Navigate to={`/${currentRole}/dashboard`} replace />;
   }
 
-  return <Navigate to={`/${role}/login`} replace />;
+  return <Navigate to={`/${role}/login`} state={{ from: location }} replace />;
 }

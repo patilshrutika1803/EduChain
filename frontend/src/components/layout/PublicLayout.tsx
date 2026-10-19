@@ -1,6 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Shield, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signOutDemo } from '../../auth/demoAuth';
+import { useDemoAuth } from '../../auth/useDemoAuth';
+import { useToast } from '../ui/Toast';
 
 const navLinks = [
   { label: 'Home', to: '/' },
@@ -11,6 +15,19 @@ const navLinks = [
 export function PublicNav() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { role } = useDemoAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = () => {
+    try {
+      signOutDemo();
+      setOpen(false);
+      navigate('/', { replace: true });
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to sign out in this browser.', 'error');
+    }
+  };
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-30">
@@ -30,7 +47,7 @@ export function PublicNav() {
               <Link
                 key={l.to}
                 to={l.to}
-                className={`text-sm font-medium transition-colors ${location.pathname === l.to ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`text-sm font-medium transition-colors ${(l.to === '/#about' ? location.hash === '#about' : location.pathname === l.to) ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'}`}
               >
                 {l.label}
               </Link>
@@ -38,12 +55,25 @@ export function PublicNav() {
           </div>
 
           <div className="hidden md:flex items-center gap-2 ml-auto">
-            <Link to="/student/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 transition-colors">
-              Student Login
-            </Link>
-            <Link to="/institution/login" className="text-sm font-medium bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
-              Institution Login
-            </Link>
+            {role ? (
+              <>
+                <Link to={`/${role}/dashboard`} className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 transition-colors">
+                  My {role === 'student' ? 'Student' : 'Institution'} Dashboard
+                </Link>
+                <button type="button" onClick={handleSignOut} className="text-sm font-medium bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/student/login" className="text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 transition-colors">
+                  Student Login
+                </Link>
+                <Link to="/institution/login" className="text-sm font-medium bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                  Institution Login
+                </Link>
+              </>
+            )}
           </div>
 
           <button type="button" aria-label={open ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={open} className="md:hidden ml-auto p-2 text-slate-500" onClick={() => setOpen(v => !v)}>
@@ -60,8 +90,21 @@ export function PublicNav() {
               {l.label}
             </Link>
           ))}
-          <Link to="/student/login" onClick={() => setOpen(false)} className="block py-2 text-sm font-medium text-slate-700">Student Login</Link>
-          <Link to="/institution/login" onClick={() => setOpen(false)} className="block py-2 text-sm font-medium text-blue-600">Institution Login</Link>
+          {role ? (
+            <>
+              <Link to={`/${role}/dashboard`} onClick={() => setOpen(false)} className="block py-2 text-sm font-medium text-slate-700">
+                My {role === 'student' ? 'Student' : 'Institution'} Dashboard
+              </Link>
+              <button type="button" onClick={handleSignOut} className="block py-2 text-sm font-medium text-blue-600">
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/student/login" onClick={() => setOpen(false)} className="block py-2 text-sm font-medium text-slate-700">Student Login</Link>
+              <Link to="/institution/login" onClick={() => setOpen(false)} className="block py-2 text-sm font-medium text-blue-600">Institution Login</Link>
+            </>
+          )}
         </div>
       )}
     </nav>
@@ -69,6 +112,19 @@ export function PublicNav() {
 }
 
 export function PublicFooter() {
+  const navigate = useNavigate();
+  const { role } = useDemoAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = () => {
+    try {
+      signOutDemo();
+      navigate('/', { replace: true });
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to sign out in this browser.', 'error');
+    }
+  };
+
   return (
     <footer className="bg-[#0f172a] text-slate-400 py-10 mt-20">
       <div className="max-w-6xl mx-auto px-6">
@@ -85,8 +141,19 @@ export function PublicFooter() {
           <div className="text-xs space-y-1">
             <p className="text-slate-300 font-medium mb-2">Platform</p>
             <Link to="/verify" className="block hover:text-slate-200 transition-colors">Verify Credential</Link>
-            <Link to="/institution/login" className="block hover:text-slate-200 transition-colors">Institution Portal</Link>
-            <Link to="/student/login" className="block hover:text-slate-200 transition-colors">Student Portal</Link>
+            {role ? (
+              <>
+                <Link to={`/${role}/dashboard`} className="block hover:text-slate-200 transition-colors">
+                  {role === 'student' ? 'Student Dashboard' : 'Institution Dashboard'}
+                </Link>
+                <button type="button" onClick={handleSignOut} className="block hover:text-slate-200 transition-colors">Sign out</button>
+              </>
+            ) : (
+              <>
+                <Link to="/institution/login" className="block hover:text-slate-200 transition-colors">Institution Portal</Link>
+                <Link to="/student/login" className="block hover:text-slate-200 transition-colors">Student Portal</Link>
+              </>
+            )}
           </div>
         </div>
         <div className="border-t border-white/10 mt-8 pt-6 text-xs">

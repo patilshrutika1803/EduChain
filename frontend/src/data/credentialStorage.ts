@@ -1,4 +1,5 @@
 import type { DemoCredentialRecord } from '../types';
+import { DEMO_SEED_CREDENTIALS } from './demoSeedCredentials';
 
 const STORAGE_KEY = 'educhain-demo-credentials';
 const STORAGE_CHANGE_EVENT = 'educhain-demo-credentials-changed';
@@ -85,7 +86,10 @@ function readCredentials(): DemoCredentialRecord[] {
 
   const ids = new Set<string>();
   for (const record of parsed) {
-    if (ids.has(record.credentialId)) {
+    if (
+      ids.has(record.credentialId) ||
+      DEMO_SEED_CREDENTIALS.some((seed) => seed.credentialId === record.credentialId)
+    ) {
       throw new CredentialStorageError('Stored credential data contains duplicate credential IDs.');
     }
     ids.add(record.credentialId);
@@ -120,7 +124,7 @@ export function subscribeToCredentialChanges(listener: () => void): () => void {
 }
 
 export function listCredentials(): DemoCredentialRecord[] {
-  return readCredentials();
+  return [...readCredentials(), ...DEMO_SEED_CREDENTIALS];
 }
 
 export function resetDemoCredentials(): void {
@@ -134,7 +138,7 @@ export function resetDemoCredentials(): void {
 }
 
 export function findCredentialById(credentialId: string): DemoCredentialRecord | null {
-  return readCredentials().find((record) => record.credentialId === credentialId) ?? null;
+  return listCredentials().find((record) => record.credentialId === credentialId) ?? null;
 }
 
 export function saveCredential(record: DemoCredentialRecord): void {
@@ -143,7 +147,10 @@ export function saveCredential(record: DemoCredentialRecord): void {
   }
 
   const records = readCredentials();
-  if (records.some((existing) => existing.credentialId === record.credentialId)) {
+  if (
+    records.some((existing) => existing.credentialId === record.credentialId) ||
+    DEMO_SEED_CREDENTIALS.some((seed) => seed.credentialId === record.credentialId)
+  ) {
     throw new CredentialStorageError(`Credential ID "${record.credentialId}" already exists.`);
   }
 

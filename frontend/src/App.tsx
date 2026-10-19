@@ -33,6 +33,7 @@ import { RequireDemoRole } from './components/auth/RequireDemoRole';
 
 // Layout
 import { AppShell } from './components/layout/AppShell';
+import { StudentShell } from './components/layout/StudentShell';
 
 export default function App() {
   return (
@@ -77,11 +78,13 @@ export default function App() {
 
           {/* Student app */}
           <Route path="/student" element={<RequireDemoRole role="student" />}>
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<StudentDashboardPage />} />
-            <Route path="wallet" element={<StudentWalletPage />} />
-            <Route path="credentials/:id" element={<StudentCredentialDetailPage />} />
-            <Route path="credentials/:id/share" element={<QRSharePage />} />
+            <Route element={<StudentShell />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<StudentDashboardPage />} />
+              <Route path="wallet" element={<StudentWalletPage />} />
+              <Route path="credentials/:id" element={<StudentCredentialDetailPage />} />
+              <Route path="credentials/:id/share" element={<QRSharePage />} />
+            </Route>
           </Route>
 
           {/* 404 */}
