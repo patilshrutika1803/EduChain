@@ -69,14 +69,29 @@ revoke select (
     id, actor_profile_id, action_type, credential_id, occurred_at, metadata
 ) on table public.audit_logs from public, anon, authenticated;
 
-grant select, insert on public.profiles to authenticated;
+grant select on public.profiles to authenticated;
+grant insert (id, display_name, role) on public.profiles to authenticated;
 grant update (display_name, updated_at) on public.profiles to authenticated;
 
-grant select, insert, update on public.institutions to authenticated;
-grant select, insert, update, delete on public.institution_memberships to authenticated;
+grant select on public.institutions to authenticated;
+grant insert (institution_name, verification_status, public_issuer_wallet_address)
+    on public.institutions to authenticated;
+grant update (institution_name, verification_status, public_issuer_wallet_address)
+    on public.institutions to authenticated;
+grant select on public.institution_memberships to authenticated;
+grant insert (institution_id, profile_id, membership_role, membership_status)
+    on public.institution_memberships to authenticated;
+grant update (membership_role, membership_status)
+    on public.institution_memberships to authenticated;
+grant delete on public.institution_memberships to authenticated;
 grant select on public.credentials to authenticated;
 grant update (status, blockchain_transaction_hash, contract_address, updated_at)
     on public.credentials to authenticated;
+grant insert (
+    credential_identifier, student_profile_id, issuing_institution_id,
+    qualification_name, graduation_date, issue_date, status, commitment_hash,
+    blockchain_transaction_hash, contract_address
+) on public.credentials to service_role;
 grant select on public.audit_logs to authenticated;
 
 drop policy if exists credentials_insert_verified_institution_issuer
