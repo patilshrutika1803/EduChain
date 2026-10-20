@@ -1,9 +1,55 @@
 import { Link } from "react-router-dom"
 import { Shield, Share2, QrCode, Wallet } from "lucide-react"
 import { useStudentCredentials } from "../useStudentCredentials"
+import { useAuth } from "../../../auth/AuthProvider"
+import { useApiCredentialRecords } from "../../../data/useApiCredentialRecords"
 
 export function StudentWalletPage() {
+  const { mode } = useAuth()
+  const live = useApiCredentialRecords(mode === "supabase")
   const { credentials, error, loading } = useStudentCredentials()
+
+  if (mode === "supabase") {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">
+        <div className="flex items-center gap-2">
+          <Wallet size={16} className="text-blue-600" />
+          <h1 className="font-semibold text-slate-900 text-sm">My Credential Wallet</h1>
+        </div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Database credentials are off-chain records. The API scopes this list to your authenticated student profile; this view does not claim blockchain verification.
+        </div>
+        {live.error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{live.error}</div>}
+        {live.loading && <p role="status" className="text-sm text-slate-500">Loading your credentials...</p>}
+        {live.credentials.map((credential) => (
+          <div key={credential.id} className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-900">{credential.qualification_name}</h2>
+                <p className="mt-1 text-xs text-slate-500">Graduated {credential.graduation_date}</p>
+              </div>
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold uppercase text-amber-800">
+                {credential.status} / OFF-CHAIN
+              </span>
+            </div>
+            <p className="mt-4 break-all font-mono text-xs text-slate-500">ID: {credential.credential_identifier}</p>
+            <p className="mt-3 break-all font-mono text-xs text-slate-500">Commitment: {credential.commitment_hash}</p>
+            <Link
+              to={`/student/credentials/${encodeURIComponent(credential.credential_identifier)}`}
+              className="mt-4 inline-flex text-xs font-medium text-blue-700 hover:text-blue-900"
+            >
+              View credential details
+            </Link>
+          </div>
+        ))}
+        {!live.loading && !live.error && live.credentials.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+            No credentials are available for this account.
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-8">

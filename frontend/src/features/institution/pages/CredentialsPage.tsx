@@ -3,8 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Search, PlusCircle, Info } from 'lucide-react';
 import { Card } from '../../../components/ui/Card';
 import { useCredentialRecords } from '../../../data/useCredentialRecords';
+import { useAuth } from '../../../auth/AuthProvider';
+import { useApiCredentialRecords } from '../../../data/useApiCredentialRecords';
 
 export function CredentialsPage() {
+  const { mode } = useAuth();
+  const live = useApiCredentialRecords(mode === 'supabase');
   const { credentials, error, loading } = useCredentialRecords();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
@@ -23,6 +27,78 @@ export function CredentialsPage() {
     || credential.degree.toLowerCase().includes(normalizedSearch)
     || credential.department.toLowerCase().includes(normalizedSearch),
   );
+
+  if (mode === 'supabase') {
+    const liveFiltered = live.credentials.filter((credential) =>
+      `${credential.credential_identifier} ${credential.qualification_name} ${credential.status}`
+        .toLowerCase()
+        .includes(normalizedSearch),
+    );
+    return (
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6 gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Credentials</h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {live.loading ? 'Loading database credentials...' : `${live.credentials.length} database credential${live.credentials.length === 1 ? '' : 's'}`}
+            </p>
+          </div>
+          <Link to="/institution/credentials/issue" className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+            <PlusCircle size={14} /> Issue New
+          </Link>
+        </div>
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          Database records are off-chain only. The API limits these results to active, verified institution memberships; they are not blockchain-verified.
+        </div>
+        <Card className="mb-5">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                const next = new URLSearchParams(searchParams);
+                if (event.target.value.trim()) next.set('search', event.target.value);
+                else next.delete('search');
+                setSearchParams(next, { replace: true });
+              }}
+              placeholder="Search credential ID, qualification, or status"
+              aria-label="Search credentials"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </Card>
+        {live.error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{live.error}</div>}
+        <Card padding="none">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-50 border-b border-slate-200">
+                {['Credential ID', 'Qualification', 'Graduation date', 'Issue date', 'Status', 'Actions'].map((heading) => (
+                  <th key={heading} className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{heading}</th>
+                ))}
+              </tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {liveFiltered.map((credential) => (
+                  <tr key={credential.id}>
+                    <td className="px-5 py-3.5 font-mono text-xs">{credential.credential_identifier}</td>
+                    <td className="px-5 py-3.5">{credential.qualification_name}</td>
+                    <td className="px-5 py-3.5">{credential.graduation_date}</td>
+                    <td className="px-5 py-3.5">{credential.issue_date}</td>
+                    <td className="px-5 py-3.5"><span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold uppercase text-amber-800">{credential.status} / OFF-CHAIN</span></td>
+                    <td className="px-5 py-3.5">
+                      <Link to={`/institution/credentials/${encodeURIComponent(credential.credential_identifier)}`} className="text-xs font-medium text-blue-600 hover:text-blue-800">View</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {live.loading && <p role="status" className="text-center text-sm text-slate-500 py-8">Loading credentials...</p>}
+            {!live.loading && !live.error && liveFiltered.length === 0 && <p className="text-center text-sm text-slate-500 py-8">No matching database credentials.</p>}
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">

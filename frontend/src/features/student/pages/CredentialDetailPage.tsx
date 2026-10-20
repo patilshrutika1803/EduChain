@@ -2,11 +2,64 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Info } from 'lucide-react';
 import { Card } from '../../../components/ui/Card';
 import { useStudentCredentials } from '../useStudentCredentials';
+import { useAuth } from '../../../auth/AuthProvider';
+import { useApiCredentialRecords } from '../../../data/useApiCredentialRecords';
 
 export function StudentCredentialDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const { mode } = useAuth();
+  const live = useApiCredentialRecords(mode === 'supabase');
   const { credentials, error, loading } = useStudentCredentials();
   const credential = credentials.find((candidate) => candidate.credentialId === id);
+  const liveCredential = live.credentials.find((candidate) => candidate.credential_identifier === id);
+
+  if (mode === 'supabase') {
+    return (
+      <div className="min-h-screen bg-slate-50 px-6 py-10">
+        <div className="mx-auto max-w-3xl space-y-5">
+          <Link to="/student/wallet" className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800">
+            <ArrowLeft size={15} /> Back to My Wallet
+          </Link>
+          {live.error ? (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{live.error}</div>
+          ) : live.loading ? (
+            <p role="status" className="text-sm text-slate-500">Loading your credential...</p>
+          ) : liveCredential ? (
+            <>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900">Credential Details</h1>
+                <p className="mt-1 break-all font-mono text-sm text-slate-500">{liveCredential.credential_identifier}</p>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                DATABASE / OFF-CHAIN ONLY. This record is not a blockchain transaction or public verification proof.
+              </div>
+              <Card padding="lg">
+                <dl className="grid gap-5 sm:grid-cols-2">
+                  {([
+                    ['Qualification', liveCredential.qualification_name],
+                    ['Graduation date', liveCredential.graduation_date],
+                    ['Issue date', liveCredential.issue_date],
+                    ['Status', liveCredential.status],
+                    ['SHA-256 commitment', liveCredential.commitment_hash],
+                  ] as const).map(([label, value]) => (
+                    <div key={label} className={label === 'SHA-256 commitment' ? 'sm:col-span-2' : undefined}>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
+                      <dd className="mt-1 break-all text-sm text-slate-900">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
+            </>
+          ) : (
+            <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+              <h1 className="text-lg font-semibold text-slate-800">Credential not found</h1>
+              <p className="mt-2 text-sm text-slate-500">This record is not available to your authenticated student profile.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 py-10">

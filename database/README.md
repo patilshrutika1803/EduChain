@@ -149,16 +149,20 @@ blockchain reference fields, and `updated_at` (which the trigger sets);
 authenticated credential inserts remain disallowed.
 
 Authenticated users do not receive direct credential `INSERT` privileges or
-an insert policy. The current backend does not yet implement credential
-issuance; a future server-side issuance endpoint must authenticate the
-requester's Supabase identity, verify an active issuer/institution-admin
-membership for the issuing institution, and then perform the trusted
-database-and-contract workflow. The hardening migration grants column-scoped
-credential `INSERT` to Supabase's `service_role` for that trusted workflow;
-that role and any privileged Supabase key must remain server-side and must not
-be included in browser code. The insert trigger continues to generate audit
-rows, while clients retain no direct audit-log insert, update, or delete
-access.
+an insert policy. The backend now exposes authenticated credential reads and
+a validated issuance endpoint. Reads use the caller's JWT and apply both
+application-level scoping and RLS. Issuance verifies the caller's profile role,
+active membership role, verified institution, and target student profile. The
+hardening migration grants column-scoped credential `INSERT` to Supabase's
+`service_role`; consequently the endpoint refuses issuance unless the backend
+has both a server-only `SUPABASE_SERVICE_ROLE_KEY` and
+`EDUCHAIN_DATABASE_HARDENING_VALIDATED=true`. A database owner must set that
+flag only after reviewing and validating the migration and live permissions.
+Neither migration has been validated or applied in the current project, so
+database-backed issuance is not enabled or claimed to work. No service-role
+key is used or exposed by the frontend. The insert trigger continues to
+generate audit rows, while clients retain no direct audit-log insert, update,
+or delete access.
 
 The existing credential update trigger already rejects changes outside the
 contract's allowed status transitions (`Active -> Suspended`, `Active ->
@@ -181,3 +185,7 @@ enabling `FORCE ROW LEVEL SECURITY`.
   relationship between the database record and its on-chain commitment.
 - The optional wallet, transaction hash, and contract address are stored as
   text and are not validated against a particular chain or deployment.
+- The current API creates database-only records. The API commitment is not a
+  salted privacy-preserving proof and is not submitted to the Solidity
+  registry. No contract address, network, or backend transaction signer is
+  configured.

@@ -5,16 +5,20 @@ import { Card } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { hashCredentialData } from '../../../data/credentialHash';
 import { listCredentials, saveCredential } from '../../../data/credentialStorage';
+import { issueCredential, type ApiCredential } from '../../../data/credentialApi';
+import { useAuth } from '../../../auth/AuthProvider';
 import type { DemoCredentialData, DemoCredentialRecord } from '../../../types';
 
 interface CredentialForm {
   studentName: string;
   studentId: string;
   studentEmail: string;
+  studentProfileId: string;
   degree: string;
   department: string;
   cgpa: string;
   graduationYear: string;
+  graduationDate: string;
 }
 
 type FormErrors = Partial<Record<keyof CredentialForm, string>>;
@@ -23,10 +27,12 @@ const emptyForm: CredentialForm = {
   studentName: '',
   studentId: '',
   studentEmail: '',
+  studentProfileId: '',
   degree: '',
   department: '',
   cgpa: '',
   graduationYear: '',
+  graduationDate: '',
 };
 
 function createCredentialId(): string {
@@ -83,11 +89,19 @@ function validateForm(form: CredentialForm): {
 }
 
 export function IssueCredentialPage() {
+  const { mode: authMode } = useAuth();
+  const backendMode = authMode === 'supabase';
   const [form, setForm] = useState<CredentialForm>(emptyForm);
   const [errors, setErrors] = useState<FormErrors>({});
   const [step, setStep] = useState<'form' | 'review' | 'success'>('form');
   const [reviewData, setReviewData] = useState<Omit<DemoCredentialData, 'credentialId' | 'issueTimestamp' | 'status'> | null>(null);
   const [record, setRecord] = useState<DemoCredentialRecord | null>(null);
+  const [backendRecord, setBackendRecord] = useState<ApiCredential | null>(null);
+  const [realReviewData, setRealReviewData] = useState<{
+    studentProfileId: string;
+    qualificationName: string;
+    graduationDate: string;
+  } | null>(null);
   const [issueError, setIssueError] = useState('');
   const [isIssuing, setIsIssuing] = useState(false);
   const submissionInProgress = useRef(false);
@@ -100,6 +114,32 @@ export function IssueCredentialPage() {
 
   const openReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (backendMode) {
+      const profileId = form.studentProfileId.trim();
+      const graduationDate = form.graduationDate;
+      const nextErrors: FormErrors = {};
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profileId)) {
+        nextErrors.studentProfileId = 'Enter a valid student profile UUID.';
+      }
+      if (!form.degree.trim()) nextErrors.degree = 'Enter the qualification name.';
+      if (!form.department.trim()) nextErrors.department = 'Enter the department.';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(graduationDate) ||
+        Number.isNaN(Date.parse(`${graduationDate}T00:00:00.000Z`)) ||
+        new Date(`${graduationDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== graduationDate) {
+        nextErrors.graduationDate = 'Enter a valid graduation date.';
+      }
+      setErrors(nextErrors);
+      setIssueError('');
+      if (Object.keys(nextErrors).length > 0) return;
+      setRealReviewData({
+        studentProfileId: profileId,
+        qualificationName: `${form.degree.trim()} - ${form.department.trim()}`,
+        graduationDate,
+      });
+      setStep('review');
+      return;
+    }
+
     const result = validateForm(form);
     setErrors(result.errors);
     setIssueError('');
@@ -109,13 +149,26 @@ export function IssueCredentialPage() {
   };
 
   const confirmIssuance = async () => {
-    if (!reviewData || submissionInProgress.current) return;
+    if (submissionInProgress.current) return;
 
     submissionInProgress.current = true;
     setIsIssuing(true);
     setIssueError('');
 
     try {
+      if (backendMode) {
+        if (!realReviewData) {
+          throw new Error('Review the credential details before issuing.');
+        }
+        const saved = await issueCredential(realReviewData);
+        setBackendRecord(saved);
+        setStep('success');
+        return;
+      }
+      if (!reviewData) {
+        throw new Error('Review the credential details before issuing.');
+      }
+
       const existingIds = new Set(listCredentials().map((credential) => credential.credentialId));
       let credentialId = '';
       for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -152,6 +205,52 @@ export function IssueCredentialPage() {
     setStep('form');
     setIssueError('');
   };
+
+  if (step === 'success' && backendRecord) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Issue New Credential</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Credential record saved by the EduChain API.</p>
+        </div>
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+          <p>
+            <strong>DATABASE / OFF-CHAIN ONLY.</strong> This record is not a blockchain transaction,
+            digital signature, or public verification proof.
+          </p>
+        </div>
+        <Card padding="lg">
+          <div className="flex items-center gap-2 text-green-700">
+            <CheckCircle2 size={20} />
+            <h2 className="font-semibold">Database record created</h2>
+          </div>
+          <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Credential ID</dt>
+              <dd className="mt-1 break-all font-mono text-sm text-slate-900">{backendRecord.credential_identifier}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Qualification</dt>
+              <dd className="mt-1 text-sm text-slate-900">{backendRecord.qualification_name}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Graduation date</dt>
+              <dd className="mt-1 text-sm text-slate-900">{backendRecord.graduation_date}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Status</dt>
+              <dd className="mt-1 text-sm font-semibold text-amber-700">OFF-CHAIN / NOT BLOCKCHAIN VERIFIED</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">SHA-256 commitment</dt>
+              <dd className="mt-1 break-all font-mono text-xs text-slate-700">{backendRecord.commitment_hash}</dd>
+            </div>
+          </dl>
+        </Card>
+      </div>
+    );
+  }
 
   if (step === 'success' && record) {
     return (
@@ -234,15 +333,17 @@ export function IssueCredentialPage() {
       <div>
         <h1 className="text-xl font-bold text-slate-900">Issue New Credential</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          {step === 'review' ? 'Review the academic details before local issuance.' : 'Enter academic details to prepare a local demonstration credential.'}
+          {backendMode
+            ? step === 'review' ? 'Review the database credential request.' : 'Enter a student profile ID and qualification details.'
+            : step === 'review' ? 'Review the academic details before local issuance.' : 'Enter academic details to prepare a local demonstration credential.'}
         </p>
       </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
         <Info size={16} className="mt-0.5 flex-shrink-0" />
-        <p>
-          DEMO / LOCAL ONLY. Do not enter real student information. No blockchain transaction, digital
-          signature, or issuer authorization will occur.
+        <p>{backendMode
+          ? 'API / OFF-CHAIN ONLY. Issuance requires a verified institution issuer membership and database-owner validation. No blockchain transaction or signature will occur.'
+          : 'DEMO / LOCAL ONLY. Do not enter real student information. No blockchain transaction, digital signature, or issuer authorization will occur.'}
         </p>
       </div>
 
@@ -250,6 +351,16 @@ export function IssueCredentialPage() {
         <Card padding="lg">
           <form onSubmit={openReview} noValidate className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
+              {backendMode ? (
+                <Input
+                  label="Student profile UUID"
+                  autoComplete="off"
+                  value={form.studentProfileId}
+                  onChange={(event) => updateField('studentProfileId', event.target.value)}
+                  error={errors.studentProfileId}
+                  hint="Use the student's Supabase profile UUID; the API verifies that it is a student profile."
+                />
+              ) : <>
               <Input
                 label="Student name"
                 autoComplete="off"
@@ -273,8 +384,9 @@ export function IssueCredentialPage() {
                 error={errors.studentEmail}
                 hint="Credentials appear only in the wallet signed in with this email."
               />
+              </>}
               <Input
-                label="Degree"
+                label={backendMode ? 'Qualification' : 'Degree'}
                 autoComplete="off"
                 value={form.degree}
                 onChange={(event) => updateField('degree', event.target.value)}
@@ -287,7 +399,7 @@ export function IssueCredentialPage() {
                 onChange={(event) => updateField('department', event.target.value)}
                 error={errors.department}
               />
-              <Input
+              {!backendMode && <Input
                 label="CGPA"
                 type="number"
                 min="0"
@@ -297,8 +409,14 @@ export function IssueCredentialPage() {
                 value={form.cgpa}
                 onChange={(event) => updateField('cgpa', event.target.value)}
                 error={errors.cgpa}
-              />
-              <Input
+              />}
+              {backendMode ? <Input
+                label="Graduation date"
+                type="date"
+                value={form.graduationDate}
+                onChange={(event) => updateField('graduationDate', event.target.value)}
+                error={errors.graduationDate}
+              /> : <Input
                 label="Graduation year"
                 type="text"
                 inputMode="numeric"
@@ -308,7 +426,7 @@ export function IssueCredentialPage() {
                 onChange={(event) => updateField('graduationYear', event.target.value)}
                 error={errors.graduationYear}
                 hint={`Four digits, 1900–${new Date().getFullYear() + 10}.`}
-              />
+              />}
             </div>
             <div className="flex justify-end pt-2">
               <Button type="submit">Review details</Button>
@@ -317,9 +435,13 @@ export function IssueCredentialPage() {
         </Card>
       ) : (
         <Card padding="lg">
-          <h2 className="font-semibold text-slate-900">Review academic details</h2>
+          <h2 className="font-semibold text-slate-900">Review {backendMode ? 'credential request' : 'academic details'}</h2>
           <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            {([
+            {(backendMode ? [
+              ['Student profile UUID', realReviewData?.studentProfileId],
+              ['Qualification', realReviewData?.qualificationName],
+              ['Graduation date', realReviewData?.graduationDate],
+            ] as const : [
               ['Student name', reviewData?.studentName],
               ['Student ID', reviewData?.studentId],
               ['Student email', reviewData?.studentEmail],
@@ -347,7 +469,7 @@ export function IssueCredentialPage() {
             </Button>
             <Button type="button" onClick={confirmIssuance} loading={isIssuing} disabled={isIssuing}>
               <LockKeyhole size={15} />
-              Confirm local issuance
+              {backendMode ? 'Submit issuance request' : 'Confirm local issuance'}
             </Button>
           </div>
         </Card>

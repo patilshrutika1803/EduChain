@@ -21,11 +21,15 @@ Traditional educational credentials can be difficult to verify efficiently and m
 
 ## System Architecture
 
-The project currently includes a React frontend, an Express authentication API,
-and an independently developed Solidity smart contract. Supabase Auth login,
-student signup, session restoration, and backend-verified profile roles are
-implemented. Credential workflows still use browser-local demonstration data,
-and the frontend does not submit transactions to or read data from the contract.
+The project currently includes a React frontend, an Express API, and an
+independently developed Solidity smart contract. Supabase Auth login, student
+signup, session restoration, and backend-verified profile roles are
+implemented. Authenticated credential list/detail endpoints and an API-backed
+issuance request now exist; issuance remains disabled until a database owner
+validates/applies the migrations and the backend-only service-role gate is
+configured. The demo credential flow remains browser-local and is separate
+from API records. The frontend does not submit transactions to or read data
+from the contract.
 
 ```mermaid
 flowchart TD
@@ -34,12 +38,11 @@ flowchart TD
     V[Public Verifier] --> F
 
     F --> A[Supabase Auth / Opt-in Demo Auth]
-    A --> B[Express API: Verify Token + Resolve Profile Role]
+    A --> B[Express API: Verify Token + Resolve Profile Role + Credential Routes]
     B --> D[Supabase]
     F --> C[Credential Management UI]
-    C --> L[Browser Local Storage]
-    C --> H[Browser SHA-256 Hashing]
-    H --> Q[Local Integrity Check]
+    C --> L[Demo-only Browser Local Storage]
+    C --> D
 
     J[Solidity Smart Contract] --> R[Issuer Authorization]
     J --> G[Credential Commitment Registry]
@@ -52,9 +55,11 @@ flowchart TD
 
 ### Frontend
 
-- The institution interface demonstrates credential management and issuance
-  workflows.
-- The student interface displays credentials for a demo student account.
+- The institution interface uses the credential API when signed in through
+  Supabase; backend issuance is gated on validated database permissions.
+- Explicit demo mode retains its clearly labeled local-only issuance workflow.
+- The student interface uses API-scoped reads for Supabase sessions and shows
+  browser-local data only in explicit demo mode.
 - The public verification interface checks credentials against locally stored
   demonstration data.
 - Browser local storage holds the demo records, and browser SHA-256 hashing is
@@ -75,6 +80,9 @@ flowchart TD
 - The student account includes the synthetic `EDU-DEMO-STUDENT-001` record
   (`DEMO / LOCAL ONLY`). Its matching local SHA-256 hash does not establish
   issuer authenticity and is not blockchain-backed verification.
+- Database credential records contain only the schema's qualification,
+  graduation date, status, identifiers, and commitment. They do not include
+  the demo UI's student name, student ID, department, email, or CGPA.
 
 ### Blockchain
 
@@ -91,11 +99,12 @@ revocation.
 - The frontend is not connected to the smart contract and does not verify
   issuer authorization or credential status against an on-chain registry.
 - The initial and hardening database migrations have not been validated or
-  applied to the Supabase project. Authentication can verify a Supabase user,
-  but role-based application access remains blocked until the schema and
-  profile policies are validated and provisioned.
-- Credential records and workflows remain browser-local; this milestone does
-  not implement credential issuance or blockchain verification.
+  applied to the Supabase project. Database-backed credential reads or
+  issuance must not be considered operational until the project schema,
+  policies, and grants are confirmed by a database owner.
+- The backend API does not integrate with the contract or perform a
+  blockchain transaction. Database issuance, when explicitly enabled after
+  validation, is off-chain only and is not a signature or public proof.
 
 ## Project Structure
 
@@ -121,16 +130,16 @@ EduChain/
 EduChain is currently a **UI prototype and blockchain development demonstration**.
 
 - The frontend uses Supabase Auth when configured; opt-in demo authentication
-  remains available for local presentations. Credential data remains
-  browser-local.
+  remains available for local presentations. Demo credential data remains
+  browser-local; Supabase credential reads use the API.
 - Frontend credential verification demonstrates local hash-integrity checking; it is not yet connected to a live blockchain registry.
 - The Solidity contract and its tests are maintained separately under `blockchain/`.
-- The backend verifies Supabase access tokens and resolves a user's application
-  role from the profile table. Database role lookup fails closed when the
-  expected schema or policies are unavailable.
+- The backend verifies Supabase access tokens, resolves roles from the profile
+  table, scopes credential reads, and validates issuer membership before
+  issuance. Database operations fail closed when the expected schema or
+  permissions are unavailable.
 - The database schema has not been validated or applied. This is an initial
-  authentication milestone, not a production-ready identity or credential
-  service.
+  prototype, not a production-ready identity or credential service.
 
 **Important:** The current prototype does not establish real-world credential authenticity, production-grade identity verification, or cross-device verification.
 
@@ -144,6 +153,20 @@ URL and publishable key. Use the same Supabase project in the frontend and
 backend; never put a service-role key in the frontend.
 Migrations must be validated and applied separately by a database owner before
 profile-based application access can work. See [database/README.md](./database/README.md).
+
+The frontend Supabase settings are `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY`. The backend requires `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY`. A database owner must first validate and apply the
+schema and hardening migrations, then provision an institution, verify it, and
+create an active issuer/admin membership. Only then may the backend be
+configured with `SUPABASE_SERVICE_ROLE_KEY` and
+`EDUCHAIN_DATABASE_HARDENING_VALIDATED=true`. Keep both backend-only; the flag
+is an operator attestation, not a substitute for reviewing the live database.
+
+No contract address, target chain/network, RPC endpoint, or transaction signer
+is configured. A contract deployment and issuer authorization, plus a reviewed
+backend transaction/signing design, are required before any blockchain call can
+be safely enabled. Current database issuance is off-chain only.
 
 Start the API and frontend in separate terminals from the project root:
 

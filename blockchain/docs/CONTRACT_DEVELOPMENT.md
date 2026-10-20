@@ -1,9 +1,9 @@
 # Local contract development
 
-This guide covers the currently implemented Solidity registry only. The React
-application remains a separately labeled browser-local demo; no backend,
-MongoDB persistence, wallet-connected frontend issuance, or connected
-verification flow has been integrated yet.
+This guide covers the currently implemented Solidity registry only. The
+frontend and backend credential API are not connected to it: the Supabase
+workflow is database-only, while explicit demo mode remains browser-local.
+There is no wallet-connected issuance or on-chain verification flow.
 
 ## Requirements
 
@@ -80,5 +80,20 @@ or performed by these scripts.
 
 The registry does not create credential IDs, canonical payloads, salts, or
 commitments. It cannot validate the meaning or academic correctness of a
-commitment; those checks belong to the not-yet-implemented backend and issuer
-workflow.
+commitment. The current backend SHA-256 database commitment is unsalted and is
+not the contract's recommended salted commitment; do not submit it to a public
+chain.
+
+## Requirements before application integration
+
+No application network or contract address is currently configured. A future
+integration must define and validate the target chain ID, deployed
+`EduChainRegistry` address, RPC endpoint, authorized issuer wallet and signer
+custody, transaction monitoring/finality policy, and versioned canonical
+payload plus per-credential salt/commitment encoding. The backend must verify
+institution membership before submitting a transaction, keep signer secrets
+server-side (or use a carefully designed user-wallet flow), persist the
+transaction hash only after submission, and reconcile failed/pending
+transactions without presenting them as issued. Contract deployment and issuer
+authorization are separate manual operations; local Hardhat deployment does
+not configure an application backend or production network.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listCredentials, subscribeToCredentialChanges } from './credentialStorage';
 import type { DemoCredentialRecord } from '../types';
+import { useAuth } from '../auth/AuthProvider';
 
 interface CredentialRecordsState {
   credentials: DemoCredentialRecord[];
@@ -9,6 +10,7 @@ interface CredentialRecordsState {
 }
 
 export function useCredentialRecords(): CredentialRecordsState {
+  const { mode } = useAuth();
   const [state, setState] = useState<CredentialRecordsState>({
     credentials: [],
     error: '',
@@ -16,6 +18,15 @@ export function useCredentialRecords(): CredentialRecordsState {
   });
 
   const refresh = useCallback(() => {
+    if (mode !== 'demo') {
+      setState({
+        credentials: [],
+        error: 'Browser-stored credentials are demo-only and are hidden outside explicit demo mode.',
+        loading: false,
+      });
+      return;
+    }
+
     try {
       setState({ credentials: listCredentials(), error: '', loading: false });
     } catch (error) {
@@ -25,7 +36,7 @@ export function useCredentialRecords(): CredentialRecordsState {
         loading: false,
       });
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     refresh();

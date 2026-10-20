@@ -8,6 +8,9 @@ export interface SupabaseConfiguration {
 let supabaseClient: SupabaseClient | undefined;
 let configuredUrl: string | undefined;
 let configuredPublishableKey: string | undefined;
+let serviceRoleClient: SupabaseClient | undefined;
+let configuredServiceRoleUrl: string | undefined;
+let configuredServiceRoleKey: string | undefined;
 
 export function getSupabaseConfiguration():
   | SupabaseConfiguration
@@ -66,4 +69,36 @@ export function getSupabaseUserClient(
       },
     },
   );
+}
+
+export function getSupabaseServiceRoleClient():
+  | SupabaseClient
+  | undefined {
+  if (process.env.EDUCHAIN_DATABASE_HARDENING_VALIDATED !== "true") {
+    return undefined;
+  }
+
+  const configuration = getSupabaseConfiguration();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!configuration || !serviceRoleKey) {
+    return undefined;
+  }
+
+  if (
+    !serviceRoleClient ||
+    configuredServiceRoleUrl !== configuration.url ||
+    configuredServiceRoleKey !== serviceRoleKey
+  ) {
+    serviceRoleClient = createClient(configuration.url, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        persistSession: false,
+      },
+    });
+    configuredServiceRoleUrl = configuration.url;
+    configuredServiceRoleKey = serviceRoleKey;
+  }
+
+  return serviceRoleClient;
 }

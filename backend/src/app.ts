@@ -5,8 +5,10 @@ import {
   getSupabaseUserClient,
 } from "./supabase.js";
 import { getAuthenticatedUser, requireSupabaseAuth } from "./auth.js";
+import credentialsRouter from "./credentials.js";
 
 const app = express();
+app.use(express.json({ limit: "16kb" }));
 
 app.get("/api/health", (_request, response) => {
   response.json({ status: "ok", service: "EduChain API" });
@@ -153,6 +155,50 @@ app.get("/api/auth/me", requireSupabaseAuth, async (request, response) => {
     });
   }
 });
+
+app.use("/api/credentials", requireSupabaseAuth, credentialsRouter);
+
+app.use(
+  (
+    error: unknown,
+    _request: express.Request,
+    response: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      error.status === 413
+    ) {
+      response.status(413).json({
+        status: "error",
+        code: "request_too_large",
+        message: "Request body exceeds the 16 KB limit",
+      });
+      return;
+    }
+    if (
+      error instanceof SyntaxError &&
+      "status" in error &&
+      error.status === 400
+    ) {
+      response.status(400).json({
+        status: "error",
+        code: "invalid_json",
+        message: "Request body must contain valid JSON",
+      });
+      return;
+    }
+    console.error(
+      `[API] Request failed (${error instanceof Error ? error.name : "UnknownError"})`,
+    );
+    response.status(500).json({
+      status: "error",
+      message: "The request could not be completed",
+    });
+  },
+);
 
 app.use((_request, response) => {
   response.status(404).json({ status: "error", message: "Not found" });
