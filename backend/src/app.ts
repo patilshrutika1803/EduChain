@@ -6,6 +6,7 @@ import {
 } from "./supabase.js";
 import { getAuthenticatedUser, requireSupabaseAuth } from "./auth.js";
 import credentialsRouter from "./credentials.js";
+import { createNeonHealthHandler } from "./neon.js";
 
 const app = express();
 app.use(express.json({ limit: "16kb" }));
@@ -13,6 +14,8 @@ app.use(express.json({ limit: "16kb" }));
 app.get("/api/health", (_request, response) => {
   response.json({ status: "ok", service: "EduChain API" });
 });
+
+app.get("/api/health/neon", createNeonHealthHandler());
 
 app.get("/api/health/supabase", async (_request, response) => {
   const configuration = getSupabaseConfiguration();

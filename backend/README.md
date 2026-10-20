@@ -2,7 +2,8 @@
 
 The backend is a Node.js, Express, and TypeScript API with a local health check
 at `GET /api/health` and a Supabase connectivity check at
-`GET /api/health/supabase`. `GET /api/auth/me` verifies the incoming bearer
+`GET /api/health/supabase`, plus a Neon PostgreSQL connectivity check at
+`GET /api/health/neon`. `GET /api/auth/me` verifies the incoming bearer
 token with Supabase Auth and resolves the caller's role from that user's
 `public.profiles` row using the caller's JWT. Unknown routes return a JSON 404.
 The API never accepts a role from the browser. A service-role key is used only
@@ -47,6 +48,12 @@ On macOS or Linux, use `cp backend/.env.example backend/.env`. Keep the
 project's actual values in `backend/.env` or another local secret store; do not
 put them in source files or commit them. `.env` is ignored by Git, while
 `.env.example` contains placeholders and remains trackable.
+
+For the Neon health check, set `DATABASE_URL` in `backend/.env` (or inject it
+into the backend process in deployment). The server loads `backend/.env` first
+and then root `.env.local` as a local fallback; values already set by the
+process environment or `backend/.env` are not overridden. Do not expose this
+server-only connection string to the frontend or commit it.
 
 ## Typecheck
 
@@ -100,6 +107,22 @@ API returns:
 Missing configuration or a failed health check returns HTTP `503` with a
 generic JSON error message. The check does not require a database table and
 does not expose project keys or upstream response details.
+
+## Neon PostgreSQL connectivity check
+
+Set `DATABASE_URL` for the backend as described above, start the API, and
+request this exact URL:
+
+```sh
+curl http://localhost:3001/api/health/neon
+```
+
+The endpoint executes `SELECT 1` against the configured PostgreSQL database.
+It returns HTTP `200` only when the query succeeds; missing configuration or a
+failed query returns HTTP `503` with a generic JSON error. It never returns or
+logs the connection string or internal connection details. The backend tests
+for this endpoint use mocked query functions and do not verify a live Neon
+connection.
 
 ## Authentication and profile roles
 

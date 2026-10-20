@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import app from "./app.js";
 
 config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
+config({ path: fileURLToPath(new URL("../../.env.local", import.meta.url)) });
 
 const port = Number(process.env.PORT ?? 3001);
 
