@@ -4,35 +4,55 @@ import { AlertCircle, Shield, Mail, Lock, Wallet } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { DemoCredentialsPanel } from '../../components/auth/DemoCredentialsPanel';
-import { authenticateDemo, getDemoLoginRedirect } from '../../auth/demoAuth';
-import { useDemoAuth } from '../../auth/useDemoAuth';
+import { getDemoLoginRedirect } from '../../auth/demoAuth';
+import { useAuth } from '../../auth/AuthProvider';
 
 export function StudentLoginPage() {
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const auth = useDemoAuth();
+  const auth = useAuth();
 
   if (auth.role) {
     return <Navigate to={getDemoLoginRedirect(auth.role, location.state)} replace />;
   }
 
-  const handleLogin = (event?: React.FormEvent<HTMLFormElement>) => {
-    event?.preventDefault();
-    if (!email.trim() || !password.trim()) {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!email.trim() || !password) {
       setError('Please enter your email and password.');
       return;
     }
+    if (creatingAccount && !displayName.trim()) {
+      setError('Please enter your name.');
+      return;
+    }
+    setError('');
+    setNotice('');
+    setBusy(true);
     try {
-      if (!authenticateDemo('student', email, password)) {
-        setError('Invalid student demo email or password.');
-        return;
+      if (creatingAccount) {
+        const needsConfirmation = await auth.signUp(email, password, displayName);
+        if (needsConfirmation) {
+          setNotice('Account created. Check your email to confirm it, then sign in.');
+          setCreatingAccount(false);
+        } else {
+          navigate(getDemoLoginRedirect('student', location.state), { replace: true });
+        }
+      } else {
+        await auth.signIn('student', email, password);
+        navigate(getDemoLoginRedirect('student', location.state), { replace: true });
       }
-      navigate(getDemoLoginRedirect('student', location.state), { replace: true });
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : 'Unable to start the student demo session.');
+      setError(authError instanceof Error ? authError.message : 'Unable to complete authentication.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -57,7 +77,32 @@ export function StudentLoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleLogin}>
+          {auth.mode === 'unconfigured' && (
+            <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+              Supabase authentication is not configured. Set
+              {' '}<code>VITE_SUPABASE_URL</code> and
+              {' '}<code>VITE_SUPABASE_PUBLISHABLE_KEY</code> in the frontend environment.
+              Demo mode remains disabled unless explicitly enabled.
+            </div>
+          )}
+          {auth.mode === 'demo' && (
+            <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+              Local demo authentication is enabled; it is not Supabase-backed.
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            {creatingAccount && (
+              <div className="mb-4">
+                <Input
+                  label="Full name"
+                  type="text"
+                  autoComplete="name"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                />
+              </div>
+            )}
             <div className="space-y-4">
               <Input
                 label="Email"
@@ -71,14 +116,15 @@ export function StudentLoginPage() {
                 label="Password"
                 type="password"
                 placeholder="••••••••"
+                autoComplete={creatingAccount ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 prefix={<Lock size={14} />}
               />
             </div>
 
-            <Button type="submit" variant="primary" className="w-full justify-center mt-5">
-              Sign In
+            <Button type="submit" variant="primary" className="w-full justify-center mt-5" disabled={busy || auth.status === 'loading' || auth.mode === 'unconfigured' || (creatingAccount && auth.mode === 'demo')}>
+              {busy ? 'Please wait…' : creatingAccount ? 'Create Student Account' : 'Sign In'}
             </Button>
 
             <div className="mt-4">
@@ -93,15 +139,30 @@ export function StudentLoginPage() {
             </div>
           </form>
 
+          {notice && <p role="status" className="mt-4 text-center text-sm text-green-700">{notice}</p>}
+          {auth.mode === 'supabase' && (
+            <button
+              type="button"
+              className="mt-4 w-full text-center text-sm text-blue-700 hover:underline"
+              onClick={() => {
+                setCreatingAccount(value => !value);
+                setError('');
+                setNotice('');
+              }}
+            >
+              {creatingAccount ? 'Already have an account? Sign in' : 'Create a student account'}
+            </button>
+          )}
+
           <p className="mt-4 text-xs text-slate-500 text-center">
-            Simulated prototype-only authentication. This does not verify student identity or connect to an institution.
+            Student roles are limited to the account owner. This does not verify identity or credential authenticity.
           </p>
-          {auth.error && (
+          {auth.status === 'error' && auth.error && (
             <p role="alert" className="mt-3 text-center text-xs text-red-700">
-              Demo session storage is unavailable: {auth.error}
+              {auth.error}
             </p>
           )}
-          <DemoCredentialsPanel role="student" />
+          {auth.mode === 'demo' && <DemoCredentialsPanel role="student" />}
         </div>
 
         <p className="text-center mt-5 text-xs text-slate-400">

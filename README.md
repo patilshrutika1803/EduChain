@@ -21,9 +21,11 @@ Traditional educational credentials can be difficult to verify efficiently and m
 
 ## System Architecture
 
-The project currently consists of two separate parts: a browser-based frontend
-demonstration and an independently developed Solidity smart contract. The
-frontend does not submit transactions to or read data from the contract.
+The project currently includes a React frontend, an Express authentication API,
+and an independently developed Solidity smart contract. Supabase Auth login,
+student signup, session restoration, and backend-verified profile roles are
+implemented. Credential workflows still use browser-local demonstration data,
+and the frontend does not submit transactions to or read data from the contract.
 
 ```mermaid
 flowchart TD
@@ -31,7 +33,9 @@ flowchart TD
     S[Student User] --> F
     V[Public Verifier] --> F
 
-    F --> A[Demo Authentication]
+    F --> A[Supabase Auth / Opt-in Demo Auth]
+    A --> B[Express API: Verify Token + Resolve Profile Role]
+    B --> D[Supabase]
     F --> C[Credential Management UI]
     C --> L[Browser Local Storage]
     C --> H[Browser SHA-256 Hashing]
@@ -44,8 +48,6 @@ flowchart TD
 
     L -. "Not connected" .-> J
 
-    B[Backend Placeholder]
-    D[Database Placeholder]
 ```
 
 ### Frontend
@@ -57,8 +59,15 @@ flowchart TD
   demonstration data.
 - Browser local storage holds the demo records, and browser SHA-256 hashing is
   used to demonstrate local integrity checking.
-- Demo authentication is for demonstration only and is not production-grade
-  authentication.
+- Supabase Auth is the default authentication path when configured. The
+  backend verifies access tokens and resolves roles from `public.profiles`;
+  browser-supplied roles are not trusted.
+- A user may sign up as a student. Institution profiles must be provisioned
+  through a trusted administrator process; public signup cannot grant
+  institution privileges.
+- Demo authentication remains available only when explicitly enabled with
+  `VITE_EDUCHAIN_DEMO_MODE=true`; it is separate from Supabase Auth and is not
+  production-grade authentication.
 - The frontend demo accounts are `student.demo@example.test` /
   `StudentDemo@123` and `institution.demo@example.test` /
   `InstitutionDemo@123`. Session storage holds only the role and an eight-hour
@@ -81,7 +90,12 @@ revocation.
   authorized institution genuinely issued the credential.
 - The frontend is not connected to the smart contract and does not verify
   issuer authorization or credential status against an on-chain registry.
-- The backend and database folders are documentation placeholders.
+- The initial and hardening database migrations have not been validated or
+  applied to the Supabase project. Authentication can verify a Supabase user,
+  but role-based application access remains blocked until the schema and
+  profile policies are validated and provisioned.
+- Credential records and workflows remain browser-local; this milestone does
+  not implement credential issuance or blockchain verification.
 
 ## Project Structure
 
@@ -89,8 +103,8 @@ revocation.
 EduChain/
 ├── frontend/    # React + TypeScript + Vite application
 ├── blockchain/  # Solidity smart contract, tests and scripts
-├── backend/     # Documentation placeholder
-├── database/    # Documentation placeholder
+├── backend/     # Express API and Supabase auth verification
+├── database/    # Supabase schema migrations (not yet applied)
 ├── package.json
 ├── pnpm-workspace.yaml
 └── pnpm-lock.yaml
@@ -106,10 +120,17 @@ EduChain/
 
 EduChain is currently a **UI prototype and blockchain development demonstration**.
 
-- The frontend uses browser-local demo authentication and local storage.
+- The frontend uses Supabase Auth when configured; opt-in demo authentication
+  remains available for local presentations. Credential data remains
+  browser-local.
 - Frontend credential verification demonstrates local hash-integrity checking; it is not yet connected to a live blockchain registry.
 - The Solidity contract and its tests are maintained separately under `blockchain/`.
-- The backend and database folders contain documentation placeholders; no production backend or database integration is implemented.
+- The backend verifies Supabase access tokens and resolves a user's application
+  role from the profile table. Database role lookup fails closed when the
+  expected schema or policies are unavailable.
+- The database schema has not been validated or applied. This is an initial
+  authentication milestone, not a production-ready identity or credential
+  service.
 
 **Important:** The current prototype does not establish real-world credential authenticity, production-grade identity verification, or cross-device verification.
 
@@ -117,14 +138,30 @@ EduChain is currently a **UI prototype and blockchain development demonstration*
 
 Install [Node.js](https://nodejs.org/) and [pnpm](https://pnpm.io/).
 
-From the project root:
+Copy `frontend/.env.example` to `frontend/.env.local` and
+`backend/.env.example` to `backend/.env`, then configure the Supabase project
+URL and publishable key. Use the same Supabase project in the frontend and
+backend; never put a service-role key in the frontend.
+Migrations must be validated and applied separately by a database owner before
+profile-based application access can work. See [database/README.md](./database/README.md).
+
+Start the API and frontend in separate terminals from the project root:
 
 ```bash
-pnpm install
-pnpm run dev
+pnpm api:dev
+```
+
+```bash
+pnpm dev
 ```
 
 Use the local URL printed by Vite to open the frontend in your browser.
+Vite forwards `/api` requests to the API on port `3001` during development.
+
+The local demo login and protected demo workspaces are disabled by default.
+To enable them for a local presentation, set
+`VITE_EDUCHAIN_DEMO_MODE=true` in `frontend/.env.local` before starting Vite.
+Demo mode takes precedence over Supabase and is not a production auth method.
 
 ## Smart Contract Tests
 
@@ -137,8 +174,9 @@ pnpm run contracts:test
 ## Future Scope
 
 - Connect the frontend to a deployed smart contract.
-- Implement secure institutional authentication.
-- Add backend services and persistent storage.
+- Provision institutional profiles through a trusted administrator workflow.
+- Validate and apply the database migrations, then complete database-backed
+  application workflows.
 - Integrate QR-based verification with verifiable credential proofs.
 - Conduct security, privacy, and usability testing.
 

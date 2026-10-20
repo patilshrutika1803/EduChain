@@ -47,3 +47,23 @@ export function getSupabaseClient(
 
   return supabaseClient;
 }
+
+export function getSupabaseUserClient(
+  configuration: SupabaseConfiguration,
+  accessToken: string,
+): SupabaseClient {
+  return createClient(
+    configuration.url,
+    configuration.publishableKey,
+    {
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+      auth: {
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        persistSession: false,
+      },
+    },
+  );
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDemoSession, subscribeToDemoAuth, type DemoRole } from './demoAuth';
+import { isDemoModeEnabled } from './demoMode';
 
 interface DemoAuthState {
   role: DemoRole | null;
@@ -8,6 +9,10 @@ interface DemoAuthState {
 }
 
 function readDemoAuth(): DemoAuthState {
+  if (!isDemoModeEnabled()) {
+    return { role: null, expiresAt: null, error: '' };
+  }
+
   try {
     const session = getDemoSession();
     return { role: session?.role ?? null, expiresAt: session?.expiresAt ?? null, error: '' };
@@ -24,6 +29,10 @@ export function useDemoAuth(): DemoAuthState {
   const [state, setState] = useState(readDemoAuth);
 
   useEffect(() => {
+    if (!isDemoModeEnabled()) {
+      return;
+    }
+
     const refresh = () => setState(readDemoAuth());
     return subscribeToDemoAuth(refresh);
   }, []);

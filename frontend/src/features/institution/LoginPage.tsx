@@ -4,35 +4,37 @@ import { Shield, Mail, Lock, Wallet, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { DemoCredentialsPanel } from '../../components/auth/DemoCredentialsPanel';
-import { authenticateDemo, getDemoLoginRedirect } from '../../auth/demoAuth';
-import { useDemoAuth } from '../../auth/useDemoAuth';
+import { getDemoLoginRedirect } from '../../auth/demoAuth';
+import { useAuth } from '../../auth/AuthProvider';
 
 export function InstitutionLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const auth = useDemoAuth();
+  const auth = useAuth();
 
   if (auth.role) {
     return <Navigate to={getDemoLoginRedirect(auth.role, location.state)} replace />;
   }
 
-  const handleLogin = (event?: React.FormEvent<HTMLFormElement>) => {
-    event?.preventDefault();
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError('Please enter your email and password.');
       return;
     }
+    setError('');
+    setBusy(true);
     try {
-      if (!authenticateDemo('institution', email, password)) {
-        setError('Invalid institution demo email or password.');
-        return;
-      }
+      await auth.signIn('institution', email, password);
       navigate(getDemoLoginRedirect('institution', location.state), { replace: true });
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : 'Unable to start the institution demo session.');
+      setError(authError instanceof Error ? authError.message : 'Unable to sign in.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -56,6 +58,20 @@ export function InstitutionLoginPage() {
               <div role="alert" className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 mb-5 text-sm text-red-700">
                 <AlertCircle size={14} className="flex-shrink-0" />
                 {error}
+              </div>
+            )}
+
+            {auth.mode === 'unconfigured' && (
+              <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                Supabase authentication is not configured. Set
+                {' '}<code>VITE_SUPABASE_URL</code> and
+                {' '}<code>VITE_SUPABASE_PUBLISHABLE_KEY</code> in the frontend environment.
+                Demo mode remains disabled unless explicitly enabled.
+              </div>
+            )}
+            {auth.mode === 'demo' && (
+              <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                Local demo authentication is enabled; it is not Supabase-backed.
               </div>
             )}
 
@@ -83,8 +99,8 @@ export function InstitutionLoginPage() {
                 <span className="text-xs text-slate-400">Password recovery is unavailable in this prototype.</span>
               </div>
 
-              <Button type="submit" variant="primary" className="w-full justify-center">
-                Sign In
+              <Button type="submit" variant="primary" className="w-full justify-center" disabled={busy || auth.status === 'loading' || auth.mode === 'unconfigured'}>
+                {busy ? 'Signing in…' : 'Sign In'}
               </Button>
 
               <div className="mt-4">
@@ -100,14 +116,15 @@ export function InstitutionLoginPage() {
             </form>
 
             <p className="mt-4 text-xs text-slate-500 text-center">
-              Simulated prototype-only authentication. This does not verify issuer identity or connect to an institution.
+              Institution accounts must be provisioned by an authorized administrator.
+              Public sign-up cannot grant an institution role.
             </p>
-            {auth.error && (
+            {auth.status === 'error' && auth.error && (
               <p role="alert" className="mt-3 text-center text-xs text-red-700">
-                Demo session storage is unavailable: {auth.error}
+                {auth.error}
               </p>
             )}
-            <DemoCredentialsPanel role="institution" />
+            {auth.mode === 'demo' && <DemoCredentialsPanel role="institution" />}
           </div>
 
           <div className="mt-6 text-center text-xs text-slate-500">

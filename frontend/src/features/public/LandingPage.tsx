@@ -13,7 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { PublicNav, PublicFooter } from '../../components/layout/PublicLayout';
-import { useDemoAuth } from '../../auth/useDemoAuth';
+import { useAuth } from '../../auth/AuthProvider';
 
 const HOW_STEPS = [
   { n: '01', title: 'Issue a local demo', desc: 'An institution demo account saves fictional academic details in this browser.' },
@@ -45,7 +45,7 @@ const TRUST_PILLARS = [
 ];
 
 export function LandingPage() {
-  const { role } = useDemoAuth();
+  const { role } = useAuth();
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">

@@ -80,6 +80,21 @@ The first platform administrator and verified institutions require a trusted
 administrator/bootstrap process outside this migration. No self-service path
 is provided to verify an institution or grant platform privileges.
 
+## Application authentication dependency
+
+The backend verifies Supabase access tokens, then reads the caller's own
+`profiles.role` using the same bearer token. The frontend permits an
+authenticated user's own `student` profile to be created only through the
+`profiles_insert_self_as_student` policy. Institution portal access requires
+an administrator-provisioned `institution_admin` profile; signup cannot
+assign it. The application fails closed if the profile table, grants, or RLS
+policies are missing or unavailable.
+
+These migrations have not been validated or applied to the configured
+Supabase project. Do not assume the application authentication flow is
+end-to-end until a database owner has reviewed and applied the appropriate
+migrations in timestamp order and confirmed the expected schema and policies.
+
 ## RLS policies
 
 RLS is enabled on all five tables. Table privileges are revoked from both

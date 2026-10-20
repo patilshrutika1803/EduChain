@@ -1,3 +1,5 @@
+import { isDemoModeEnabled } from './demoMode';
+
 export type DemoRole = 'student' | 'institution';
 
 export interface DemoSession {
@@ -121,6 +123,10 @@ export function getDemoSession(): DemoSession | null {
 }
 
 export function authenticateDemo(role: DemoRole, email: string, password: string): boolean {
+  if (!isDemoModeEnabled()) {
+    return false;
+  }
+
   const account = DEMO_ACCOUNTS[role];
   if (email.trim().toLowerCase() !== account.email || password !== account.password) {
     return false;

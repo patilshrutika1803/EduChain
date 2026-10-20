@@ -1,18 +1,19 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { GraduationCap, LayoutDashboard, LogOut, Shield, Wallet } from 'lucide-react';
-import { signOutDemo } from '../../auth/demoAuth';
+import { useAuth } from '../../auth/AuthProvider';
 import { useToast } from '../ui/Toast';
 
 export function StudentShell() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     try {
-      signOutDemo();
+      await signOut();
       navigate('/student/login', { replace: true });
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Unable to sign out in this browser.', 'error');
+      toast(error instanceof Error ? error.message : 'Unable to sign out.', 'error');
     }
   };
 

@@ -29,7 +29,7 @@ import { StudentDashboardPage } from './features/student/DashboardPage';
 import { StudentCredentialDetailPage } from './features/student/pages/CredentialDetailPage';
 import { QRSharePage } from './features/student/pages/QRSharePage';
 import { StudentWalletPage } from './features/student/pages/WalletPage';
-import { RequireDemoRole } from './components/auth/RequireDemoRole';
+import { RequireAuthRole } from './components/auth/RequireAuthRole';
 
 // Layout
 import { AppShell } from './components/layout/AppShell';
@@ -50,7 +50,7 @@ export default function App() {
           <Route path="/institution/login" element={<InstitutionLoginPage />} />
 
           {/* Institution app (sidebar shell) */}
-          <Route path="/institution" element={<RequireDemoRole role="institution" />}>
+          <Route path="/institution" element={<RequireAuthRole role="institution" />}>
             <Route element={<AppShell />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<InstitutionDashboardPage />} />
@@ -77,7 +77,7 @@ export default function App() {
           <Route path="/student/login" element={<StudentLoginPage />} />
 
           {/* Student app */}
-          <Route path="/student" element={<RequireDemoRole role="student" />}>
+          <Route path="/student" element={<RequireAuthRole role="student" />}>
             <Route element={<StudentShell />}>
               <Route index element={<Navigate to="dashboard" replace />} />
               <Route path="dashboard" element={<StudentDashboardPage />} />

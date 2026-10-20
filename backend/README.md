@@ -2,9 +2,10 @@
 
 The backend is a Node.js, Express, and TypeScript API with a local health check
 at `GET /api/health` and a Supabase connectivity check at
-`GET /api/health/supabase`. Unknown routes return a JSON 404. This milestone
-does not include authentication flows, persistence, credential routes, or
-blockchain integration.
+`GET /api/health/supabase`. `GET /api/auth/me` verifies the incoming bearer
+token with Supabase Auth and resolves the caller's role from that user's
+`public.profiles` row using the caller's JWT. Unknown routes return a JSON 404.
+The API does not use a service-role key or accept a role from the browser.
 
 ## Requirements
 
@@ -28,6 +29,9 @@ pnpm api:dev
 ```
 
 The server listens on port `3001` by default. Set `PORT` to override it.
+During Vite development, the frontend proxies `/api` requests to this server.
+Deployments must route `/api` to the backend on the same origin or provide an
+appropriate API base URL and CORS/reverse-proxy configuration.
 
 To configure Supabase locally, copy `backend/.env.example` to `backend/.env`
 and replace the placeholder values with the project URL and publishable key
@@ -94,3 +98,25 @@ API returns:
 Missing configuration or a failed health check returns HTTP `503` with a
 generic JSON error message. The check does not require a database table and
 does not expose project keys or upstream response details.
+
+## Authentication and profile roles
+
+The backend verifies access tokens with `supabase.auth.getUser(token)`. The
+`/api/auth/me` endpoint then queries `profiles` with the same user token, so
+Supabase RLS applies. Only `student` maps to the student portal and
+`institution_admin` maps to the institution portal; missing profiles,
+unsupported roles, and database errors fail closed.
+
+The frontend supports password login and session restoration. Student signup
+creates only a `student` profile, subject to the database's self-insert policy.
+Institution accounts must already have an administrator-provisioned
+`institution_admin` profile. No browser input or signup choice can grant that
+role.
+
+The SQL migrations in `database/` have not been validated or applied to the
+Supabase project. Until a database owner validates and provisions the expected
+schema, policies, and grants, profile resolution or student signup may return
+an error and protected application routes remain unavailable. The API
+intentionally does not invent a role or bypass missing database permissions.
+See [database/README.md](../database/README.md) for the schema and required
+provisioning process.

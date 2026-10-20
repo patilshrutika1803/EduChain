@@ -4,7 +4,7 @@ import {
   Building2, Link2, BarChart3, ScrollText, Settings, LogOut,
   Wallet, Shield,
 } from 'lucide-react';
-import { signOutDemo } from '../../auth/demoAuth';
+import { useAuth } from '../../auth/AuthProvider';
 import { useToast } from '../ui/Toast';
 
 const NAV_GROUPS = [
@@ -54,13 +54,14 @@ interface SidebarProps {
 export function Sidebar({ mobile, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     try {
-      signOutDemo();
+      await signOut();
       navigate('/institution/login', { replace: true });
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Unable to sign out in this browser.', 'error');
+      toast(error instanceof Error ? error.message : 'Unable to sign out.', 'error');
     }
   };
 

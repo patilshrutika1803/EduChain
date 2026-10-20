@@ -2,7 +2,9 @@ import express from "express";
 import {
   getSupabaseClient,
   getSupabaseConfiguration,
+  getSupabaseUserClient,
 } from "./supabase.js";
+import { getAuthenticatedUser, requireSupabaseAuth } from "./auth.js";
 
 const app = express();
 
@@ -82,6 +84,72 @@ app.get("/api/health/supabase", async (_request, response) => {
       status: "error",
       service: "Supabase",
       message: "Unable to reach the Supabase project",
+    });
+  }
+});
+
+app.get("/api/auth/me", requireSupabaseAuth, async (request, response) => {
+  const user = getAuthenticatedUser(request);
+  const accessToken = request.authAccessToken;
+  const configuration = getSupabaseConfiguration();
+  if (!user || !accessToken || !configuration) {
+    response.status(401).json({
+      status: "error",
+      message: "A valid authenticated session is required",
+    });
+    return;
+  }
+
+  try {
+    const { data, error } = await getSupabaseUserClient(
+      configuration,
+      accessToken,
+    )
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        `[Auth role] Profile lookup failed (${error.code || "unknown"})`,
+      );
+      response.status(503).json({
+        status: "error",
+        message: "Unable to verify the account profile; database setup may be incomplete",
+      });
+      return;
+    }
+
+    if (!data) {
+      response.status(403).json({
+        status: "error",
+        code: "profile_not_found",
+        message: "This authenticated account has no EduChain profile",
+      });
+      return;
+    }
+
+    if (data.role === "student") {
+      response.json({ id: user.id, email: user.email, role: "student" });
+      return;
+    }
+    if (data.role === "institution_admin") {
+      response.json({ id: user.id, email: user.email, role: "institution" });
+      return;
+    }
+
+    response.status(403).json({
+      status: "error",
+      code: "unsupported_profile_role",
+      message: "This account is not enabled for the EduChain application",
+    });
+  } catch (error) {
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    console.error(`[Auth role] Profile lookup failed (${errorName})`);
+    response.status(503).json({
+      status: "error",
+      message: "Unable to verify the account profile; database setup may be incomplete",
     });
   }
 });

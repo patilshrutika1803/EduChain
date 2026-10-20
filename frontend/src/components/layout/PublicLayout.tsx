@@ -2,8 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Shield, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signOutDemo } from '../../auth/demoAuth';
-import { useDemoAuth } from '../../auth/useDemoAuth';
+import { useAuth } from '../../auth/AuthProvider';
 import { useToast } from '../ui/Toast';
 
 const navLinks = [
@@ -16,16 +15,16 @@ export function PublicNav() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { role } = useDemoAuth();
+  const { role, signOut } = useAuth();
   const { toast } = useToast();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     try {
-      signOutDemo();
+      await signOut();
       setOpen(false);
       navigate('/', { replace: true });
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Unable to sign out in this browser.', 'error');
+      toast(error instanceof Error ? error.message : 'Unable to sign out.', 'error');
     }
   };
 
@@ -113,15 +112,15 @@ export function PublicNav() {
 
 export function PublicFooter() {
   const navigate = useNavigate();
-  const { role } = useDemoAuth();
+  const { role, signOut } = useAuth();
   const { toast } = useToast();
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     try {
-      signOutDemo();
+      await signOut();
       navigate('/', { replace: true });
     } catch (error) {
-      toast(error instanceof Error ? error.message : 'Unable to sign out in this browser.', 'error');
+      toast(error instanceof Error ? error.message : 'Unable to sign out.', 'error');
     }
   };
 
