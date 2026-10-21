@@ -85,16 +85,41 @@ grant update (membership_role, membership_status)
     on public.institution_memberships to authenticated;
 grant delete on public.institution_memberships to authenticated;
 grant select on public.credentials to authenticated;
-grant update (status, blockchain_transaction_hash, contract_address, updated_at)
-    on public.credentials to authenticated;
+revoke all on table public.credentials from service_role;
+revoke select (
+    id, credential_identifier, student_profile_id, issuing_institution_id,
+    qualification_name, graduation_date, issue_date, status, commitment_hash,
+    blockchain_transaction_hash, contract_address, created_at, updated_at
+), insert (
+    id, credential_identifier, student_profile_id, issuing_institution_id,
+    qualification_name, graduation_date, issue_date, status, commitment_hash,
+    blockchain_transaction_hash, contract_address, created_at, updated_at
+), update (
+    id, credential_identifier, student_profile_id, issuing_institution_id,
+    qualification_name, graduation_date, issue_date, status, commitment_hash,
+    blockchain_transaction_hash, contract_address, created_at, updated_at
+), references (
+    id, credential_identifier, student_profile_id, issuing_institution_id,
+    qualification_name, graduation_date, issue_date, status, commitment_hash,
+    blockchain_transaction_hash, contract_address, created_at, updated_at
+) on table public.credentials from service_role;
+
+-- Issuance needs INSERT plus SELECT of the fields returned by the trusted API.
+-- Do not replace these column grants with broad table-level write privileges.
+grant select (
+    id, credential_identifier, student_profile_id, issuing_institution_id,
+    qualification_name, graduation_date, issue_date, status, commitment_hash,
+    blockchain_transaction_hash, contract_address, created_at
+) on table public.credentials to service_role;
 grant insert (
     credential_identifier, student_profile_id, issuing_institution_id,
-    qualification_name, graduation_date, issue_date, status, commitment_hash,
-    blockchain_transaction_hash, contract_address
+    qualification_name, graduation_date, status, commitment_hash
 ) on public.credentials to service_role;
 grant select on public.audit_logs to authenticated;
 
 drop policy if exists credentials_insert_verified_institution_issuer
+    on public.credentials;
+drop policy if exists credentials_update_verified_institution_issuer
     on public.credentials;
 
 create or replace function public.set_profile_role(
@@ -156,5 +181,102 @@ revoke all on function public.set_profile_role(uuid, text)
     from public, anon, authenticated;
 grant execute on function public.set_profile_role(uuid, text)
     to authenticated;
+
+do $block$
+begin
+    if not has_table_privilege(
+        'authenticated', 'public.credentials', 'SELECT'
+    ) then
+        raise exception 'Authenticated credential SELECT privilege is missing';
+    end if;
+
+    if exists (
+        select 1
+        from pg_catalog.pg_attribute a
+        where a.attrelid = 'public.credentials'::regclass
+          and a.attnum > 0
+          and not a.attisdropped
+          and (
+              has_column_privilege('authenticated', a.attrelid, a.attname, 'INSERT')
+              or has_column_privilege('authenticated', a.attrelid, a.attname, 'UPDATE')
+              or has_column_privilege('authenticated', a.attrelid, a.attname, 'REFERENCES')
+          )
+    ) then
+        raise exception 'Authenticated users retain credential INSERT, UPDATE, or REFERENCES privileges';
+    end if;
+
+    if has_table_privilege('authenticated', 'public.credentials', 'DELETE')
+       or has_table_privilege('authenticated', 'public.credentials', 'TRUNCATE') then
+        raise exception 'Authenticated users retain credential DELETE or TRUNCATE privileges';
+    end if;
+
+    if has_table_privilege('service_role', 'public.credentials', 'SELECT')
+       or has_table_privilege('service_role', 'public.credentials', 'INSERT')
+       or has_table_privilege('service_role', 'public.credentials', 'UPDATE')
+       or has_table_privilege('service_role', 'public.credentials', 'DELETE')
+       or has_table_privilege('service_role', 'public.credentials', 'TRUNCATE')
+       or has_table_privilege('service_role', 'public.credentials', 'REFERENCES')
+       or has_table_privilege('service_role', 'public.credentials', 'TRIGGER') then
+        raise exception 'Service role retains broad table-level credential privileges';
+    end if;
+
+    if exists (
+        select 1
+        from pg_catalog.pg_attribute a
+        where a.attrelid = 'public.credentials'::regclass
+          and a.attnum > 0
+          and not a.attisdropped
+          and (
+              has_column_privilege('service_role', a.attrelid, a.attname, 'REFERENCES')
+              or has_column_privilege('service_role', a.attrelid, a.attname, 'UPDATE')
+              or (
+                  has_column_privilege('service_role', a.attrelid, a.attname, 'INSERT')
+                  and a.attname not in (
+                      'credential_identifier', 'student_profile_id',
+                      'issuing_institution_id', 'qualification_name',
+                      'graduation_date', 'status', 'commitment_hash'
+                  )
+              )
+              or (
+                  has_column_privilege('service_role', a.attrelid, a.attname, 'SELECT')
+                  and a.attname not in (
+                      'id', 'credential_identifier', 'student_profile_id',
+                      'issuing_institution_id', 'qualification_name',
+                      'graduation_date', 'issue_date', 'status',
+                      'commitment_hash', 'blockchain_transaction_hash',
+                      'contract_address', 'created_at'
+                  )
+              )
+          )
+    ) then
+        raise exception 'Service-role credential column privileges exceed the issuance scope';
+    end if;
+
+    if exists (
+        select 1
+        from unnest(array[
+            'credential_identifier', 'student_profile_id',
+            'issuing_institution_id', 'qualification_name',
+            'graduation_date', 'status', 'commitment_hash'
+        ]) as required(column_name)
+        where not has_column_privilege(
+            'service_role', 'public.credentials', required.column_name, 'INSERT'
+        )
+    ) or exists (
+        select 1
+        from unnest(array[
+            'id', 'credential_identifier', 'student_profile_id',
+            'issuing_institution_id', 'qualification_name',
+            'graduation_date', 'issue_date', 'status', 'commitment_hash',
+            'blockchain_transaction_hash', 'contract_address', 'created_at'
+        ]) as required(column_name)
+        where not has_column_privilege(
+            'service_role', 'public.credentials', required.column_name, 'SELECT'
+        )
+    ) then
+        raise exception 'Required service-role credential issuance privileges are missing';
+    end if;
+end;
+$block$;
 
 commit;

@@ -50,9 +50,9 @@ in SQL, source code, or frontend configuration.
   `bytes32` commitment. The credential status is `active`, `suspended`, or
   `revoked`, matching the contract's `Active`, `Suspended`, and `Revoked`
   states. The student, issuer, public identifier, qualification details, issue
-  date, and commitment are immutable after insertion; status changes and
-  blockchain reference fields
-  remain updateable by authorized issuers.
+  date, and commitment are immutable after insertion. Authenticated clients
+  cannot insert or update credentials directly; the existing application
+  exposes only trusted backend issuance, not a status-update workflow.
 - **`audit_logs`** records credential issuance and changes. Its metadata is a
   JSON object containing only status values where relevant; the trigger does
   not copy student or credential details. Actor and credential references are
@@ -114,7 +114,7 @@ policies. Authenticated access is limited by the following policies:
 | `institution_memberships` | `institution_memberships_insert_admin`, `institution_memberships_update_admin`, `institution_memberships_delete_admin` | Only platform admins or active admins at the verified institution can manage its memberships. A trigger keeps membership identity fields fixed during updates. |
 | `credentials` | `credentials_select_student_or_institution_member` | Students can read only their own records; active members can read records issued by their institution; platform admins can read all. No anonymous/public credential-read policy is provided. |
 | `credentials` | *(no authenticated insert policy)* | Authenticated clients cannot insert credentials directly. Issuance is reserved for a trusted backend workflow. |
-| `credentials` | `credentials_update_verified_institution_issuer` | The existing active-membership check is retained. Column grants restrict updates to status and blockchain reference fields; a trigger prevents changing ownership, issuer, identifier, committed details, or commitment and enforces contract-compatible status transitions. |
+| `credentials` | *(no authenticated update policy)* | Authenticated clients receive no credential `UPDATE` privilege or update policy. The update trigger still protects owner-controlled updates and writes audit entries. |
 | `audit_logs` | `audit_logs_select_platform_admin` | Only platform admins can read audit history. No user-facing insert, update, or delete policy exists. |
 
 Membership and platform-role checks are implemented by `SECURITY DEFINER`
@@ -144,18 +144,25 @@ requires the role to be `student`); institution inserts and updates are limited
 to institution name, verification status, and issuer wallet address; membership
 inserts are limited to membership identity, role, and status, while updates
 are limited to role and status. Institution and membership IDs and timestamp
-fields are not directly writable. Credential updates remain limited to status,
-blockchain reference fields, and `updated_at` (which the trigger sets);
-authenticated credential inserts remain disallowed.
+fields are not directly writable. Authenticated users can read credentials
+subject to RLS but receive no credential `INSERT` or `UPDATE` privileges. The
+migration drops both direct-write credential policies; the credential update
+trigger remains in place for owner-controlled changes and audit logging.
 
-Authenticated users do not receive direct credential `INSERT` privileges or
-an insert policy. The backend now exposes authenticated credential reads and
+The backend exposes authenticated credential reads and
 a validated issuance endpoint. Reads use the caller's JWT and apply both
 application-level scoping and RLS. Issuance verifies the caller's profile role,
 active membership role, verified institution, and target student profile. The
-hardening migration grants column-scoped credential `INSERT` to Supabase's
-`service_role`; consequently the endpoint refuses issuance unless the backend
-has both a server-only `SUPABASE_SERVICE_ROLE_KEY` and
+hardening migration first revokes all direct `service_role` privileges on
+`credentials`, then grants `INSERT` only on the columns used by the issuance
+endpoint and `SELECT` only on the fields returned by that endpoint. It does
+not grant service-role credential `UPDATE` or `DELETE`; those column grants
+are not substitutes for broad table-level grants. Other `service_role`
+privileges are left unchanged because the backend uses that role to read the
+target student profile; verify the effective role memberships and grants
+separately when applying the migration. The endpoint refuses
+issuance unless the backend has both a server-only
+`SUPABASE_SERVICE_ROLE_KEY` and
 `EDUCHAIN_DATABASE_HARDENING_VALIDATED=true`. A database owner must set that
 flag only after reviewing and validating the migration and live permissions.
 Neither migration has been validated or applied in the current project, so
@@ -164,12 +171,38 @@ key is used or exposed by the frontend. The insert trigger continues to
 generate audit rows, while clients retain no direct audit-log insert, update,
 or delete access.
 
-The existing credential update trigger already rejects changes outside the
-contract's allowed status transitions (`Active -> Suspended`, `Active ->
-Revoked`, `Suspended -> Active`, and `Suspended -> Revoked`) and rejects
-changes to immutable credential data. The hardening migration retains that
-trigger, its audit trigger, all existing membership policies, and RLS without
-enabling `FORCE ROW LEVEL SECURITY`.
+The existing credential update trigger rejects changes outside the contract's
+allowed status transitions (`Active -> Suspended`, `Active -> Revoked`,
+`Suspended -> Active`, and `Suspended -> Revoked`) and rejects changes to
+immutable credential data. The hardening migration retains that trigger, its
+audit trigger, all existing profile/institution/membership policies, and RLS
+without enabling `FORCE ROW LEVEL SECURITY`.
+
+## Manual privilege verification
+
+After applying the hardening migration in the intended Supabase project, a
+database owner should verify effective role and column privileges. These
+checks are not run by this repository's local tests:
+
+```sql
+select
+    has_table_privilege('authenticated', 'public.credentials', 'SELECT') as authenticated_select,
+    has_table_privilege('authenticated', 'public.credentials', 'INSERT') as authenticated_insert,
+    has_table_privilege('authenticated', 'public.credentials', 'UPDATE') as authenticated_update,
+    has_table_privilege('service_role', 'public.credentials', 'SELECT') as service_role_table_select,
+    has_table_privilege('service_role', 'public.credentials', 'INSERT') as service_role_table_insert,
+    has_table_privilege('service_role', 'public.credentials', 'UPDATE') as service_role_table_update,
+    has_table_privilege('service_role', 'public.credentials', 'DELETE') as service_role_table_delete,
+    has_column_privilege('service_role', 'public.credentials', 'commitment_hash', 'INSERT') as service_role_issue_insert,
+    has_column_privilege('service_role', 'public.credentials', 'commitment_hash', 'SELECT') as service_role_return_select;
+```
+
+Expected results: authenticated `SELECT=true`, authenticated `INSERT/UPDATE=false`,
+service-role table-level `SELECT/INSERT/UPDATE/DELETE=false`, and service-role
+column-level `INSERT/SELECT=true` for the issuance/returned fields. Also inspect
+`pg_policies`, `pg_trigger`, `pg_proc`/function ACLs, and role memberships to
+confirm RLS, guards, trigger functions, and inherited grants match the reviewed
+migration. The service-role key must remain server-only.
 
 ## Limitations
 
