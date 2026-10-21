@@ -3,9 +3,29 @@ import { Activity, ArrowRight, Info } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { NetworkBadge } from '../../components/ui/NetworkBadge';
 import { useCredentialRecords } from '../../data/useCredentialRecords';
+import { useApiCredentialRecords } from '../../data/useApiCredentialRecords';
+import { useAuth } from '../../auth/AuthProvider';
 
 export function InstitutionDashboardPage() {
-  const { credentials, error } = useCredentialRecords();
+  const { mode } = useAuth();
+  const live = useApiCredentialRecords(mode === 'supabase');
+  const demo = useCredentialRecords();
+  const isBackendMode = mode === 'supabase';
+  const credentials = isBackendMode
+    ? live.credentials.map((credential) => ({
+        id: credential.credential_identifier,
+        student: credential.student_profile_id,
+        qualification: credential.qualification_name,
+        status: `${credential.status.toUpperCase()} / OFF-CHAIN`,
+      }))
+    : demo.credentials.map((credential) => ({
+        id: credential.credentialId,
+        student: credential.studentName,
+        qualification: credential.degree,
+        status: 'DEMO / LOCAL ONLY',
+      }));
+  const error = isBackendMode ? live.error : demo.error;
+  const loading = isBackendMode && live.loading;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -14,13 +34,21 @@ export function InstitutionDashboardPage() {
       <div className="flex items-center justify-between mb-7">
         <div>
           <h1 className="text-xl font-bold text-slate-900">{greeting}, Institution Portal</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Institution overview of locally saved demonstration credentials.</p>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {isBackendMode
+              ? 'Institution overview of credentials available to your authenticated account.'
+              : 'Institution overview of locally saved demonstration credentials.'}
+          </p>
         </div>
       </div>
 
       <div className="mb-7 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
         <Info size={15} className="mt-0.5 flex-shrink-0" />
-        <p>DEMO / LOCAL ONLY. These records persist in this browser; no blockchain transaction or issuer authorization is connected.</p>
+        <p>
+          {isBackendMode
+            ? 'DATABASE / OFF-CHAIN ONLY. Records come from the authenticated API; no blockchain transaction or issuer signature is represented.'
+            : 'DEMO / LOCAL ONLY. These records persist in this browser; no blockchain transaction or issuer authorization is connected.'}
+        </p>
       </div>
       {error && (
         <div role="alert" className="mb-7 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -51,28 +79,31 @@ export function InstitutionDashboardPage() {
                 </thead>
                 <tbody>
                   {credentials.slice(0, 5).map(c => (
-                    <tr key={c.credentialId} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                    <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3.5">
-                        <code className="font-mono text-xs text-slate-700">{c.credentialId}</code>
+                        <code className="font-mono text-xs text-slate-700">{c.id}</code>
                       </td>
-                      <td className="px-5 py-3.5 font-medium text-slate-900">{c.studentName}</td>
-                      <td className="px-5 py-3.5 text-slate-600 text-xs">{c.degree}</td>
+                      <td className="px-5 py-3.5 font-medium text-slate-900">{c.student}</td>
+                      <td className="px-5 py-3.5 text-slate-600 text-xs">{c.qualification}</td>
                       <td className="px-5 py-3.5">
-                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">DEMO / LOCAL ONLY</span>
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{c.status}</span>
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
-                              <Link to={`/institution/credentials/${encodeURIComponent(c.credentialId)}`} className="text-xs text-blue-600 hover:text-blue-800 font-medium">View</Link>
-                              <Link to={`/verify/${encodeURIComponent(c.credentialId)}`} className="text-xs text-slate-500 hover:text-slate-800">Check hash</Link>
+                              <Link to={`/institution/credentials/${encodeURIComponent(c.id)}`} className="text-xs text-blue-600 hover:text-blue-800 font-medium">View</Link>
+                              {!isBackendMode && <Link to={`/verify/${encodeURIComponent(c.id)}`} className="text-xs text-slate-500 hover:text-slate-800">Check hash</Link>}
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {!error && credentials.length === 0 && <p className="text-center text-sm text-slate-500 py-10">No credentials have been saved yet.</p>}
+              {loading && <p role="status" className="text-center text-sm text-slate-500 py-10">Loading database credentials...</p>}
+              {!loading && !error && credentials.length === 0 && <p className="text-center text-sm text-slate-500 py-10">No credentials are available yet.</p>}
               {!error && credentials.length > 5 && (
-                <p className="px-5 py-3 text-xs text-slate-500">Showing 5 of {credentials.length} locally saved records.</p>
+                <p className="px-5 py-3 text-xs text-slate-500">
+                  Showing 5 of {credentials.length} {isBackendMode ? 'database' : 'locally saved'} records.
+                </p>
               )}
             </div>
           </Card>
@@ -86,7 +117,9 @@ export function InstitutionDashboardPage() {
               <h2 className="font-semibold text-slate-900">Blockchain status</h2>
             </div>
             <div className="divide-y divide-slate-50">
-              <p className="text-sm text-slate-500 px-5 py-8">Not connected. Local credential saves are not blockchain activity.</p>
+              <p className="text-sm text-slate-500 px-5 py-8">
+                Not connected. {isBackendMode ? 'Database records are not blockchain activity.' : 'Local credential saves are not blockchain activity.'}
+              </p>
             </div>
             <div className="px-5 py-3 border-t border-slate-100">
               <NetworkBadge network="Not connected" />

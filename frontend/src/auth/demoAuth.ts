@@ -157,8 +157,12 @@ export function signOutDemo(): void {
   notifySessionChange();
 }
 
-export function getDemoLoginRedirect(role: DemoRole, state: unknown): string {
-  const fallback = `/${role}/dashboard`;
+export function getDemoLoginRedirect(
+  role: DemoRole | 'platform_admin',
+  state: unknown,
+): string {
+  const portalRole = role === 'platform_admin' ? 'institution' : role;
+  const fallback = `/${portalRole}/dashboard`;
   if (typeof state !== 'object' || state === null || !('from' in state)) {
     return fallback;
   }
@@ -172,9 +176,9 @@ export function getDemoLoginRedirect(role: DemoRole, state: unknown): string {
   const pathname = destination.pathname;
   if (
     typeof pathname !== 'string' ||
-    !(pathname === `/${role}` || pathname.startsWith(`/${role}/`)) ||
-    pathname === `/${role}/login` ||
-    pathname.startsWith(`/${role}/login/`)
+    !(pathname === `/${portalRole}` || pathname.startsWith(`/${portalRole}/`)) ||
+    pathname === `/${portalRole}/login` ||
+    pathname.startsWith(`/${portalRole}/login/`)
   ) {
     return fallback;
   }

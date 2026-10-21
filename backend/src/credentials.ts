@@ -5,7 +5,7 @@ import {
   getSupabaseServiceRoleClient,
   getSupabaseUserClient,
 } from "./supabase.js";
-import { getAuthenticatedUser } from "./auth.js";
+import { getAuthenticatedUser, isDesignatedPlatformAdmin } from "./auth.js";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -227,11 +227,26 @@ async function loadReadableCredentials(
 
   try {
     const role = await getProfileRole(context.client, context.user.id);
-    if (role !== "student" && role !== "institution_admin") {
+    if (
+      role !== "student" &&
+      role !== "institution_admin" &&
+      role !== "platform_admin"
+    ) {
       response.status(403).json({
         status: "error",
         code: "unsupported_profile_role",
         message: "This account is not authorized to access credentials",
+      });
+      return;
+    }
+    if (
+      role === "platform_admin" &&
+      !isDesignatedPlatformAdmin(role, context.user.id)
+    ) {
+      response.status(403).json({
+        status: "error",
+        code: "platform_admin_not_designated",
+        message: "This platform administrator account is not designated for EduChain",
       });
       return;
     }
@@ -243,7 +258,7 @@ async function loadReadableCredentials(
       );
     if (role === "student") {
       query = query.eq("student_profile_id", context.user.id);
-    } else {
+    } else if (role === "institution_admin") {
       const memberships = await getVerifiedMemberships(
         context.client,
         context.user.id,

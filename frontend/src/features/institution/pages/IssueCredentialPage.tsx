@@ -89,7 +89,7 @@ function validateForm(form: CredentialForm): {
 }
 
 export function IssueCredentialPage() {
-  const { mode: authMode } = useAuth();
+  const { mode: authMode, role } = useAuth();
   const backendMode = authMode === 'supabase';
   const [form, setForm] = useState<CredentialForm>(emptyForm);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -105,6 +105,18 @@ export function IssueCredentialPage() {
   const [issueError, setIssueError] = useState('');
   const [isIssuing, setIsIssuing] = useState(false);
   const submissionInProgress = useRef(false);
+
+  if (role === 'platform_admin') {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Credential issuance is reserved for institution administrators with an
+          active issuer membership at a verified institution. The platform
+          administrator account does not inherit issuer permissions.
+        </div>
+      </div>
+    );
+  }
 
   const updateField = (field: keyof CredentialForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));

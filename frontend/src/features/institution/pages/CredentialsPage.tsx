@@ -7,7 +7,7 @@ import { useAuth } from '../../../auth/AuthProvider';
 import { useApiCredentialRecords } from '../../../data/useApiCredentialRecords';
 
 export function CredentialsPage() {
-  const { mode } = useAuth();
+  const { mode, role } = useAuth();
   const live = useApiCredentialRecords(mode === 'supabase');
   const { credentials, error, loading } = useCredentialRecords();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -43,12 +43,18 @@ export function CredentialsPage() {
               {live.loading ? 'Loading database credentials...' : `${live.credentials.length} database credential${live.credentials.length === 1 ? '' : 's'}`}
             </p>
           </div>
-          <Link to="/institution/credentials/issue" className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
-            <PlusCircle size={14} /> Issue New
-          </Link>
+          {role !== 'platform_admin' && (
+            <Link to="/institution/credentials/issue" className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+              <PlusCircle size={14} /> Issue New
+            </Link>
+          )}
         </div>
         <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          Database records are off-chain only. The API limits these results to active, verified institution memberships; they are not blockchain-verified.
+          Database records are off-chain only.{' '}
+          {role === 'platform_admin'
+            ? 'The designated platform administrator can view records across institutions.'
+            : 'The API limits these results to active, verified institution memberships.'}{' '}
+          They are not blockchain-verified.
         </div>
         <Card className="mb-5">
           <div className="relative">

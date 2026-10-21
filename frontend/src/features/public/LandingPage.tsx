@@ -30,7 +30,7 @@ const WHY_BLOCKCHAIN = [
 ];
 
 const FEATURES = [
-  { icon: Hash, title: 'Credential Issuance', desc: 'Demo: review, hash, and save fictional credentials in browser localStorage' },
+  { icon: Hash, title: 'Credential Issuance', desc: 'Authenticated credential issuance is available when the backend and database are configured' },
   { icon: QrCode, title: 'QR link sharing (demo)', desc: 'Share a URL containing only the credential ID; verification requires the same browser-local record.' },
   { icon: Link2, title: 'Blockchain Proof', desc: 'Planned: credential proof anchoring' },
   { icon: Shield, title: 'Tamper Detection', desc: 'Demo: compare the recomputed hash with the local stored hash' },
@@ -73,16 +73,16 @@ export function LandingPage() {
             <div className="flex-1 max-w-xl">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-xs font-semibold text-blue-700 mb-6">
                 <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-                Frontend prototype — planned credential platform
+                Credential platform — database-backed flows in progress
               </div>
               <h1 className="text-4xl md:text-[2.75rem] font-black text-slate-900 leading-[1.1] mb-5 tracking-tight">
                 Demonstrate Credential Integrity with{' '}
                 <span className="text-blue-600">Local SHA-256.</span>
               </h1>
               <p className="text-base text-slate-600 mb-8 leading-relaxed max-w-md">
-                A browser-local demonstration: issue fictional credentials, save them in this browser,
-                and compare their SHA-256 hashes. Authentication is simulated; no issuer signature,
-                shared registry, or blockchain integration is connected.
+                EduChain supports Supabase authentication and authenticated credential APIs when the
+                required services and database policies are configured. Public verification, issuer
+                signatures, and blockchain integration are not connected.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link
@@ -93,7 +93,7 @@ export function LandingPage() {
                 </Link>
                 {role ? (
                   <Link
-                    to={`/${role}/dashboard`}
+                    to={role === 'platform_admin' ? '/institution/dashboard' : `/${role}/dashboard`}
                     className="inline-flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-xl font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all text-sm"
                   >
                     Open my dashboard

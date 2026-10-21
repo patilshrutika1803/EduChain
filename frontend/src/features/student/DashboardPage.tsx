@@ -2,9 +2,85 @@ import { Link } from "react-router-dom"
 import { Share2, QrCode, Shield } from "lucide-react"
 import type { DemoCredentialRecord } from "../../types"
 import { useStudentCredentials } from "./useStudentCredentials"
+import { useAuth } from "../../auth/AuthProvider"
+import { useApiCredentialRecords } from "../../data/useApiCredentialRecords"
 
 export function StudentDashboardPage() {
-  const { credentials, error, loading } = useStudentCredentials()
+  const { mode } = useAuth()
+  const live = useApiCredentialRecords(mode === "supabase")
+  const demo = useStudentCredentials()
+
+  if (mode === "supabase") {
+    return (
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-slate-900">My Credentials</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Credentials available to your authenticated student account.
+          </p>
+        </div>
+        <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+          Database records are off-chain. Public verification and blockchain
+          proofs are not connected.
+        </div>
+        {live.error && (
+          <div
+            role="alert"
+            className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          >
+            Credentials could not be loaded: {live.error}
+          </div>
+        )}
+        <div className="grid gap-5 sm:grid-cols-2">
+          {live.credentials.map((credential) => (
+            <div
+              key={credential.id}
+              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            >
+              <div className="flex items-center justify-between bg-[#0f172a] px-5 py-4 text-white">
+                <div className="flex items-center gap-2">
+                  <Shield size={16} className="text-blue-400" />
+                  <h2 className="text-sm font-bold">{credential.qualification_name}</h2>
+                </div>
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold uppercase text-amber-800">
+                  {credential.status} / OFF-CHAIN
+                </span>
+              </div>
+              <div className="p-5">
+                <p className="text-sm text-slate-600">
+                  Graduated {credential.graduation_date}
+                </p>
+                <p className="mt-3 break-all font-mono text-xs text-slate-500">
+                  ID: {credential.credential_identifier}
+                </p>
+                <Link
+                  to={`/student/credentials/${encodeURIComponent(credential.credential_identifier)}`}
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  View details
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+        {live.loading && (
+          <p role="status" className="mt-5 text-sm text-slate-500">
+            Loading your credentials...
+          </p>
+        )}
+        {!live.loading && !live.error && live.credentials.length === 0 && (
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
+            <Shield size={28} className="mx-auto mb-2 text-slate-300" />
+            <p className="text-sm text-slate-500">
+              No credentials have been issued to this student account yet.
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const { credentials, error, loading } = demo
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <div className="mb-6">

@@ -4,11 +4,17 @@ import {
   getSupabaseConfiguration,
   getSupabaseUserClient,
 } from "./supabase.js";
-import { getAuthenticatedUser, requireSupabaseAuth } from "./auth.js";
+import {
+  getAuthenticatedUser,
+  isDesignatedPlatformAdmin,
+  requireSupabaseAuth,
+} from "./auth.js";
 import credentialsRouter from "./credentials.js";
 import { createNeonHealthHandler } from "./neon.js";
+import { corsMiddleware } from "./cors.js";
 
 const app = express();
+app.use(corsMiddleware);
 app.use(express.json({ limit: "16kb" }));
 
 app.get("/api/health", (_request, response) => {
@@ -141,6 +147,18 @@ app.get("/api/auth/me", requireSupabaseAuth, async (request, response) => {
     }
     if (data.role === "institution_admin") {
       response.json({ id: user.id, email: user.email, role: "institution" });
+      return;
+    }
+    if (data.role === "platform_admin") {
+      if (!isDesignatedPlatformAdmin(data.role, user.id)) {
+        response.status(403).json({
+          status: "error",
+          code: "platform_admin_not_designated",
+          message: "This platform administrator account is not designated for EduChain",
+        });
+        return;
+      }
+      response.json({ id: user.id, email: user.email, role: "platform_admin" });
       return;
     }
 

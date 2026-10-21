@@ -18,14 +18,16 @@ import {
 } from './demoAuth';
 import { isDemoModeEnabled } from './demoMode';
 import { getBrowserSupabaseClient } from './supabase';
+import { API_BASE_URL } from '../data/configuredApiBaseUrl';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'error';
 type AuthMode = 'demo' | 'supabase' | 'unconfigured';
+export type AuthRole = DemoRole | 'platform_admin';
 
 interface AuthContextValue {
   status: AuthStatus;
   mode: AuthMode;
-  role: DemoRole | null;
+  role: AuthRole | null;
   email: string | null;
   error: string;
   signIn: (role: DemoRole, email: string, password: string) => Promise<void>;
@@ -34,16 +36,22 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? '';
 
 interface ResolvedProfile {
-  role: DemoRole;
+  role: AuthRole;
 }
 
 async function getProfile(accessToken: string): Promise<ResolvedProfile> {
-  const response = await fetch(`${API_BASE}/api/auth/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error(
+      'Unable to reach the EduChain API. Check the API URL and CORS configuration.',
+    );
+  }
   const result: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
@@ -71,7 +79,9 @@ async function getProfile(accessToken: string): Promise<ResolvedProfile> {
     typeof result !== 'object' ||
     result === null ||
     !('role' in result) ||
-    (result.role !== 'student' && result.role !== 'institution')
+    (result.role !== 'student' &&
+      result.role !== 'institution' &&
+      result.role !== 'platform_admin')
   ) {
     throw new Error('The account has no supported EduChain role.');
   }
@@ -107,7 +117,7 @@ async function createStudentProfile(session: Session): Promise<void> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
-  const [role, setRole] = useState<DemoRole | null>(null);
+  const [role, setRole] = useState<AuthRole | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [error, setError] = useState('');
   const requestId = useRef(0);
@@ -119,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       session: Session | null,
       allowStudentProvision = false,
-    ): Promise<DemoRole | null> => {
+    ): Promise<AuthRole | null> => {
       const currentRequest = ++requestId.current;
       if (!session) {
         setRole(null);
@@ -251,7 +261,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!verifiedRole) {
         throw new Error('Unable to verify the account profile. Check the profile setup and try again.');
       }
-      if (verifiedRole !== requestedRole) {
+      if (
+        verifiedRole !== requestedRole &&
+        !(requestedRole === 'institution' && verifiedRole === 'platform_admin')
+      ) {
         throw new Error(
           `This account is registered as a ${verifiedRole} and cannot use the ${requestedRole} portal.`,
         );

@@ -1,6 +1,5 @@
 import { getBrowserSupabaseClient } from "../auth/supabase";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
+import { API_BASE_URL } from "./configuredApiBaseUrl";
 
 export interface ApiCredential {
   id: string;
@@ -43,7 +42,7 @@ async function authorizedFetch(
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   } catch {
     throw new Error("The credential API is unavailable. No credential was saved.");
   }

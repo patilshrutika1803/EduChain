@@ -43,12 +43,13 @@ export function RequireAuthRole({ role }: { role: DemoRole }) {
     return <Navigate to={`/${role}/login`} state={{ from: location }} replace />;
   }
 
-  if (currentRole === role) {
+  if (currentRole === role || (role === 'institution' && currentRole === 'platform_admin')) {
     return <Outlet />;
   }
 
   if (currentRole) {
-    return <Navigate to={`/${currentRole}/dashboard`} replace />;
+    const portalRole = currentRole === 'platform_admin' ? 'institution' : currentRole;
+    return <Navigate to={`/${portalRole}/dashboard`} replace />;
   }
 
   return <Navigate to={`/${role}/login`} state={{ from: location }} replace />;

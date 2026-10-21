@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AddressInfo } from "node:net";
 import app from "../src/app.js";
+import { isDesignatedPlatformAdmin } from "../src/auth.js";
 import {
   canIssueCredential,
   isAuthorizedIssuerMembership,
@@ -14,6 +15,8 @@ const environmentKeys = [
   "SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "EDUCHAIN_DATABASE_HARDENING_VALIDATED",
+  "EDUCHAIN_ADMIN_USER_ID",
+  "NODE_ENV",
 ] as const;
 const originalEnvironment = new Map(
   environmentKeys.map((key) => [key, process.env[key]]),
@@ -85,6 +88,81 @@ test("only issuer and institution administrator memberships can issue", () => {
   assert.equal(canIssueCredential("institution_admin", "viewer"), false);
   assert.equal(canIssueCredential("student", "issuer"), false);
   assert.equal(canIssueCredential(undefined, "institution_admin"), false);
+});
+
+test("only the configured profile-backed platform administrator is designated", () => {
+  const adminId = "8b68e4bd-f053-4a0a-9186-087333a729a7";
+  assert.equal(isDesignatedPlatformAdmin("platform_admin", adminId, adminId), true);
+  assert.equal(isDesignatedPlatformAdmin("student", adminId, adminId), false);
+  assert.equal(
+    isDesignatedPlatformAdmin(
+      "platform_admin",
+      "b568e4bd-f053-4a0a-9186-087333a729a7",
+      adminId,
+    ),
+    false,
+  );
+  assert.equal(isDesignatedPlatformAdmin("platform_admin", adminId, undefined), false);
+  assert.equal(isDesignatedPlatformAdmin("platform_admin", adminId, "not-a-uuid"), false);
+});
+
+test("CORS permits the production frontend and only required preflight headers", async () => {
+  const response = await fetch(`${apiUrl}/api/health`, {
+    method: "OPTIONS",
+    headers: {
+      origin: "https://edu-chain-eight.vercel.app",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "authorization, content-type",
+    },
+  });
+  assert.equal(response.status, 204);
+  assert.equal(
+    response.headers.get("access-control-allow-origin"),
+    "https://edu-chain-eight.vercel.app",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-methods"),
+    "GET, POST, OPTIONS",
+  );
+  assert.equal(
+    response.headers.get("access-control-allow-headers"),
+    "Authorization, Content-Type",
+  );
+});
+
+test("CORS rejects unknown origins, methods, and headers", async () => {
+  const deniedOrigin = await fetch(`${apiUrl}/api/health`, {
+    headers: { origin: "https://attacker.example" },
+  });
+  assert.equal(deniedOrigin.status, 403);
+
+  const deniedHeader = await fetch(`${apiUrl}/api/health`, {
+    method: "OPTIONS",
+    headers: {
+      origin: "https://edu-chain-eight.vercel.app",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "x-custom",
+    },
+  });
+  assert.equal(deniedHeader.status, 403);
+
+  const previousNodeEnv = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "development";
+    const allowedLocalhost = await fetch(`${apiUrl}/api/health`, {
+      headers: { origin: "http://localhost:5173" },
+    });
+    assert.equal(allowedLocalhost.status, 200);
+
+    process.env.NODE_ENV = "production";
+    const deniedLocalhost = await fetch(`${apiUrl}/api/health`, {
+      headers: { origin: "http://localhost:5173" },
+    });
+    assert.equal(deniedLocalhost.status, 403);
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
 });
 
 test("credential endpoints reject unauthenticated requests", async () => {
